@@ -1,994 +1,1909 @@
-<script>
-  // Simple admin flag
-  const IS_ADMIN = true;
-  const MAX_ATTACHMENT_SIZE = 3 * 1024 * 1024; // ~3MB
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Warehouse Handover Manager</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  // ===== Data & Storage =====
-  const defaultUsers = [
-    { name: "Sameer Jabbar",       role: "Manager",    email: "sameer_jabbar@yahoo.com" },
-    { name: "Ardasher A. Ahmad",   role: "Supervisor", email: "" },
-  ];
+  <!-- Bootstrap CSS -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
 
-  const defaultHandovers = [
-    {
-      id: "HNDR-001",
-      from: "Sameer Jabbar",
-      to: "Ardasher A. Ahmad",
-      items: "120 cartons of Product A",
-      longDescription: "",
-      status: "Pending",
-      date: "2025-11-20",
-      actionBy: "Sameer Jabbar",
-      attachmentName: null,
-      attachmentType: null,
-      attachmentSize: null,
-      attachmentDataUrl: null,
-    },
-    {
-      id: "HNDR-002",
-      from: "Sameer Jabbar",
-      to: "Ardasher A. Ahmad",
-      items: "45 pallets of Product B",
-      longDescription: "",
-      status: "Completed",
-      date: "2025-11-21",
-      actionBy: "Sameer Jabbar",
-      attachmentName: null,
-      attachmentType: null,
-      attachmentSize: null,
-      attachmentDataUrl: null,
-    },
-  ];
-
-  const defaultAccounts = [
-    {
-      username: "admin",
-      employeeName: "Sameer Jabbar",
-      role: "Admin",
-      status: "Active",
-    },
-  ];
-
-  let users = [];
-  let handovers = [];
-  let filteredHandovers = [];
-  let accounts = [];
-
-  function saveUsers() {
-    localStorage.setItem("warehouseUsers", JSON.stringify(users));
-  }
-
-  function loadUsers() {
-    const stored = localStorage.getItem("warehouseUsers");
-    if (stored) {
-      try {
-        users = JSON.parse(stored);
-      } catch {
-        users = [...defaultUsers];
-      }
-    } else {
-      users = [...defaultUsers];
-    }
-  }
-
-  function saveHandovers() {
-    localStorage.setItem("warehouseHandovers", JSON.stringify(handovers));
-  }
-
-  function loadHandovers() {
-    const stored = localStorage.getItem("warehouseHandovers");
-    if (stored) {
-      try {
-        handovers = JSON.parse(stored);
-      } catch {
-        handovers = [...defaultHandovers];
-      }
-    } else {
-      handovers = [...defaultHandovers];
-    }
-    filteredHandovers = [...handovers];
-  }
-
-  function saveAccounts() {
-    localStorage.setItem("warehouseAccounts", JSON.stringify(accounts));
-  }
-
-  function loadAccounts() {
-    const stored = localStorage.getItem("warehouseAccounts");
-    if (stored) {
-      try {
-        accounts = JSON.parse(stored);
-      } catch {
-        accounts = [...defaultAccounts];
-      }
-    } else {
-      accounts = [...defaultAccounts];
-    }
-  }
-
-  // ===== Utilities =====
-  function createElement(tag, className, text) {
-    const el = document.createElement(tag);
-    if (className) el.className = className;
-    if (text) el.textContent = text;
-    return el;
-  }
-
-  function formatDate(dateStr) {
-    if (!dateStr) return "";
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString("en-GB", {
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-    });
-  }
-
-  function generateId(prefix = "HNDR") {
-    const num = handovers.length + 1;
-    return `${prefix}-${String(num).padStart(3, "0")}`;
-  }
-
-  function setActiveView(viewName, persist = true) {
-    document
-      .querySelectorAll(".sidebar-item")
-      .forEach((item) => item.classList.remove("active"));
-
-    const activeSidebarItem = document.querySelector(
-      `.sidebar-item[data-view="${viewName}"]`
-    );
-    if (activeSidebarItem) {
-      activeSidebarItem.classList.add("active");
+  <style>
+    body {
+      background-color: #f5f6fa;
     }
 
-    document
-      .querySelectorAll(".view-section")
-      .forEach((sec) => sec.classList.add("d-none"));
-    const viewSection = document.querySelector(
-      `.view-section[data-view="${viewName}"]`
-    );
-    if (viewSection) {
-      viewSection.classList.remove("d-none");
+    .app-wrapper {
+      min-height: 100vh;
     }
 
-    if (persist) {
-      localStorage.setItem("warehouseActiveView", viewName);
+    .sidebar {
+      background: #1e293b;
+      color: #e5e7eb;
+      min-height: 100vh;
     }
 
-    if (viewName === "reports") {
-      renderReports();
-    }
-  }
-
-  // ===== Sidebar Navigation =====
-  function initSidebarNavigation() {
-    document.querySelectorAll(".sidebar-item").forEach((item) => {
-      item.addEventListener("click", () => {
-        const view = item.getAttribute("data-view");
-        setActiveView(view);
-      });
-    });
-
-    const logo = document.getElementById("sidebar-logo");
-    if (logo) {
-      logo.addEventListener("click", () => setActiveView("dashboard"));
-    }
-  }
-
-  // ===== Users Management =====
-  const usersTableBody = document.getElementById("users-table-body");
-  const userForm = document.getElementById("user-form");
-  const userNameInput = document.getElementById("user-name");
-  const userRoleInput = document.getElementById("user-role");
-  const userEmailInput = document.getElementById("user-email");
-  const userModal = new bootstrap.Modal(
-    document.getElementById("userModal"),
-    {}
-  );
-  const userModalTitle = document.getElementById("userModalLabel");
-  let isEditUser = false;
-  let editingUserIndex = null;
-
-  function renderUsers() {
-    if (!usersTableBody) return;
-    usersTableBody.innerHTML = "";
-    if (!users || users.length === 0) {
-      const tr = document.createElement("tr");
-      const td = document.createElement("td");
-      td.colSpan = 4;
-      td.className = "text-center text-muted";
-      td.textContent = "No users found. Please add a user.";
-      tr.appendChild(td);
-      usersTableBody.appendChild(tr);
-      return;
+    .sidebar a,
+    .sidebar button {
+      color: #e5e7eb;
+      text-decoration: none;
     }
 
-    users.forEach((u, index) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${u.name || ""}</td>
-        <td>${u.role || ""}</td>
-        <td>${u.email || ""}</td>
-        <td>
-          <button class="btn btn-sm btn-outline-secondary me-1" data-index="${index}">
-            Edit
+    .sidebar-logo {
+      font-weight: 600;
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+
+    .sidebar-item {
+      cursor: pointer;
+      padding: 0.65rem 0.75rem;
+      border-radius: 0.5rem;
+      margin-bottom: 0.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.95rem;
+    }
+
+    .sidebar-item.active,
+    .sidebar-item:hover {
+      background: #0f172a;
+    }
+
+    .view-section {
+      padding-top: 1rem;
+    }
+
+    .card-shadow {
+      border: none;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.09);
+      border-radius: 0.9rem;
+    }
+
+    .table-sm td,
+    .table-sm th {
+      padding: 0.45rem 0.5rem;
+      font-size: 0.85rem;
+    }
+
+    .badge-status {
+      font-size: 0.7rem;
+    }
+
+    .form-label {
+      font-size: 0.85rem;
+    }
+
+    .btn-sm {
+      font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid app-wrapper">
+    <div class="row g-0">
+      <!-- Sidebar -->
+      <div class="col-12 col-md-3 col-lg-2 sidebar p-3">
+        <div
+          class="d-flex align-items-center justify-content-between mb-4"
+        >
+          <div id="sidebar-logo" class="sidebar-logo">
+            🏭 Handover Manager
+          </div>
+        </div>
+
+        <div class="small text-uppercase text-secondary mb-2">
+          Navigation
+        </div>
+
+        <div
+          class="sidebar-item active"
+          data-view="dashboard"
+        >
+          📊 Dashboard
+        </div>
+        <div
+          class="sidebar-item"
+          data-view="handovers"
+        >
+          📦 Handovers
+        </div>
+        <div
+          class="sidebar-item"
+          data-view="users"
+        >
+          👤 Users
+        </div>
+        <div
+          class="sidebar-item"
+          data-view="accounts"
+        >
+          🔐 Accounts
+        </div>
+        <div
+          class="sidebar-item"
+          data-view="reports"
+        >
+          📈 Reports
+        </div>
+
+        <hr class="border-secondary my-3" />
+
+        <div id="admin-tools" class="mt-2">
+          <div class="small text-uppercase text-secondary mb-2">
+            Admin tools
+          </div>
+          <button
+            id="btn-export-json"
+            class="btn btn-outline-light btn-sm w-100 mb-2"
+            type="button"
+          >
+            Export JSON
           </button>
-          <button class="btn btn-sm btn-outline-danger" data-index="${index}">
-            Delete
+          <button
+            id="btn-import-json"
+            class="btn btn-outline-light btn-sm w-100 mb-2"
+            type="button"
+          >
+            Import JSON
           </button>
-        </td>
-      `;
-      const [editBtn, deleteBtn] = tr.querySelectorAll("button");
+          <button
+            id="btn-clear-data"
+            class="btn btn-outline-danger btn-sm w-100"
+            type="button"
+          >
+            Clear all data
+          </button>
 
-      editBtn.addEventListener("click", () => {
-        isEditUser = true;
-        editingUserIndex = index;
-        userModalTitle.textContent = "Edit User";
-        userNameInput.value = u.name || "";
-        userRoleInput.value = u.role || "";
-        userEmailInput.value = u.email || "";
-        userModal.show();
-      });
+          <input
+            type="file"
+            id="input-import-json"
+            accept="application/json"
+            class="d-none"
+          />
+        </div>
+      </div>
 
-      deleteBtn.addEventListener("click", () => {
-        if (
-          confirm(
-            `Are you sure you want to delete user "${u.name || "Unnamed"}"?`
-          )
-        ) {
-          users.splice(index, 1);
-          saveUsers();
-          renderUsers();
-          refreshUserSelectOptions();
-        }
-      });
+      <!-- Main content -->
+      <div class="col-12 col-md-9 col-lg-10 p-3 p-md-4">
+        <!-- Top bar -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-2">
+          <div>
+            <h5 class="mb-1">Warehouse Handover Platform</h5>
+            <div class="text-muted small">
+              Simple offline tool to manage handovers, users and accounts
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <input
+              type="date"
+              id="top-date"
+              class="form-control form-control-sm"
+              style="max-width: 160px"
+            />
+            <button
+              id="btn-today"
+              class="btn btn-outline-secondary btn-sm"
+              type="button"
+            >
+              Today / Reset filters
+            </button>
+          </div>
+        </div>
 
-      usersTableBody.appendChild(tr);
-    });
-  }
+        <!-- DASHBOARD VIEW -->
+        <section
+          class="view-section"
+          data-view="dashboard"
+        >
+          <div class="row g-3 mb-3">
+            <div class="col-6 col-md-3">
+              <div class="card card-shadow">
+                <div class="card-body py-3">
+                  <div class="text-muted small mb-1">Total handovers</div>
+                  <div class="h4 mb-0" id="rep-total">0</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="card card-shadow">
+                <div class="card-body py-3">
+                  <div class="text-muted small mb-1">
+                    Completed
+                  </div>
+                  <div class="h4 mb-0 text-success" id="rep-completed">
+                    0
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="card card-shadow">
+                <div class="card-body py-3">
+                  <div class="text-muted small mb-1">Pending</div>
+                  <div class="h4 mb-0 text-warning" id="rep-pending">
+                    0
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="card card-shadow">
+                <div class="card-body py-3">
+                  <div class="text-muted small mb-1">Delayed</div>
+                  <div class="h4 mb-0 text-danger" id="rep-delayed">
+                    0
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
-  function initUserModal() {
-    const btnAddUser = document.getElementById("btn-add-user");
-    if (!btnAddUser) return;
+          <div class="row g-3">
+            <div class="col-12 col-lg-6">
+              <div class="card card-shadow h-100">
+                <div class="card-header py-2">
+                  <span class="small fw-semibold">
+                    Handovers by status
+                  </span>
+                </div>
+                <div class="card-body">
+                  <canvas id="statusChart" height="220"></canvas>
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-lg-6">
+              <div class="card card-shadow h-100">
+                <div class="card-header py-2">
+                  <span class="small fw-semibold">
+                    Handovers by user
+                  </span>
+                </div>
+                <div class="card-body">
+                  <canvas id="userChart" height="220"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
-    btnAddUser.addEventListener("click", () => {
-      isEditUser = false;
-      editingUserIndex = null;
-      userModalTitle.textContent = "Add User";
-      userForm.reset();
-      userModal.show();
-    });
+        <!-- HANDOVERS VIEW -->
+        <section
+          class="view-section d-none"
+          data-view="handovers"
+        >
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="mb-0">Handovers</h6>
+            <button
+              id="btn-add-handover"
+              class="btn btn-primary btn-sm"
+              type="button"
+            >
+              + New handover
+            </button>
+          </div>
 
-    userForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const name = userNameInput.value.trim();
-      const role = userRoleInput.value.trim();
-      const email = userEmailInput.value.trim();
+          <!-- Filters -->
+          <div class="card card-shadow mb-3">
+            <div class="card-body">
+              <div class="row g-2 align-items-end">
+                <div class="col-6 col-md-3">
+                  <label class="form-label">From date</label>
+                  <input
+                    type="date"
+                    id="filter-from"
+                    class="form-control form-control-sm"
+                  />
+                </div>
+                <div class="col-6 col-md-3">
+                  <label class="form-label">To date</label>
+                  <input
+                    type="date"
+                    id="filter-to"
+                    class="form-control form-control-sm"
+                  />
+                </div>
+                <div class="col-6 col-md-2">
+                  <label class="form-label">Status</label>
+                  <select
+                    id="filter-status"
+                    class="form-select form-select-sm"
+                  >
+                    <option value="">All</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Delayed">Delayed</option>
+                  </select>
+                </div>
+                <div class="col-6 col-md-2">
+                  <label class="form-label">User</label>
+                  <select
+                    id="filter-user"
+                    class="form-select form-select-sm"
+                  >
+                    <option value="">All</option>
+                  </select>
+                </div>
+                <div class="col-12 col-md-2">
+                  <label class="form-label">Search</label>
+                  <input
+                    type="text"
+                    id="filter-search"
+                    class="form-control form-control-sm"
+                    placeholder="ID, items, user..."
+                  />
+                </div>
+                <div class="col-12 mt-2 text-end">
+                  <button
+                    id="btn-reset-filters"
+                    class="btn btn-outline-secondary btn-sm"
+                    type="button"
+                  >
+                    Reset filters
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
 
-      if (!name) {
-        alert("Name is required");
-        return;
-      }
+          <!-- Table -->
+          <div class="card card-shadow">
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>ID</th>
+                      <th>From</th>
+                      <th>To</th>
+                      <th>Items</th>
+                      <th>Status</th>
+                      <th>Date</th>
+                      <th>Action by</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="handover-table-body"></tbody>
+                  <tbody>
+                    <tr id="no-data-row">
+                      <td colspan="8" class="text-center text-muted">
+                        No handovers found. Add a new handover to get
+                        started.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
 
-      const newUser = { name, role, email };
+        <!-- USERS VIEW -->
+        <section
+          class="view-section d-none"
+          data-view="users"
+        >
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="mb-0">Users</h6>
+            <button
+              id="btn-add-user"
+              class="btn btn-primary btn-sm"
+              type="button"
+            >
+              + Add user
+            </button>
+          </div>
 
-      if (isEditUser && editingUserIndex !== null) {
-        users[editingUserIndex] = newUser;
-      } else {
-        users.push(newUser);
-      }
+          <div class="card card-shadow">
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Name</th>
+                      <th>Role</th>
+                      <th>Email</th>
+                      <th style="width: 110px"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="users-table-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
 
-      saveUsers();
-      renderUsers();
-      refreshUserSelectOptions();
-      userModal.hide();
-    });
-  }
+        <!-- ACCOUNTS VIEW -->
+        <section
+          class="view-section d-none"
+          data-view="accounts"
+        >
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="mb-0">Accounts</h6>
+            <button
+              id="btn-add-account"
+              class="btn btn-primary btn-sm"
+              type="button"
+            >
+              + Add account
+            </button>
+          </div>
 
-  function initUserForm() {
-    if (!userForm) return;
-  }
+          <div class="card card-shadow">
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Username</th>
+                      <th>Employee</th>
+                      <th>Role</th>
+                      <th>Status</th>
+                      <th style="width: 110px"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="accounts-table-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
 
-  function refreshUserSelectOptions() {
-    const selectFields = [
-      document.getElementById("handover-from"),
-      document.getElementById("handover-to"),
-      document.getElementById("handover-action-by"),
-      document.getElementById("account-employee"),
-      document.getElementById("filter-user"),
+        <!-- REPORTS VIEW -->
+        <section
+          class="view-section d-none"
+          data-view="reports"
+        >
+          <h6 class="mb-3">Reports overview</h6>
+
+          <div class="row g-3 mb-3">
+            <div class="col-6 col-md-3">
+              <div class="card card-shadow">
+                <div class="card-body py-3">
+                  <div class="text-muted small mb-1">
+                    Total handovers
+                  </div>
+                  <div class="h5 mb-0" id="rep-total">0</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="card card-shadow">
+                <div class="card-body py-3">
+                  <div class="text-muted small mb-1">
+                    Completed
+                  </div>
+                  <div class="h5 mb-0 text-success" id="rep-completed">
+                    0
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="card card-shadow">
+                <div class="card-body py-3">
+                  <div class="text-muted small mb-1">Pending</div>
+                  <div class="h5 mb-0 text-warning" id="rep-pending">
+                    0
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="card card-shadow">
+                <div class="card-body py-3">
+                  <div class="text-muted small mb-1">Delayed</div>
+                  <div class="h5 mb-0 text-danger" id="rep-delayed">
+                    0
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-12 col-lg-6">
+              <div class="card card-shadow h-100">
+                <div class="card-header py-2">
+                  <span class="small fw-semibold">
+                    Handovers by status
+                  </span>
+                </div>
+                <div class="card-body">
+                  <canvas id="statusChart2" height="220"></canvas>
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-lg-6">
+              <div class="card card-shadow h-100">
+                <div class="card-header py-2">
+                  <span class="small fw-semibold">
+                    Handovers by user
+                  </span>
+                </div>
+                <div class="card-body">
+                  <canvas id="userChart2" height="220"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Modal -->
+  <div
+    class="modal fade"
+    id="userModal"
+    tabindex="-1"
+  >
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <form id="user-form">
+          <div class="modal-header py-2">
+            <h6 class="modal-title" id="userModalLabel">
+              Add User
+            </h6>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-2">
+              <label class="form-label">Name</label>
+              <input
+                type="text"
+                id="user-name"
+                class="form-control form-control-sm"
+                required
+              />
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Role</label>
+              <input
+                type="text"
+                id="user-role"
+                class="form-control form-control-sm"
+              />
+            </div>
+            <div>
+              <label class="form-label">Email</label>
+              <input
+                type="email"
+                id="user-email"
+                class="form-control form-control-sm"
+              />
+            </div>
+          </div>
+          <div class="modal-footer py-2">
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              data-bs-dismiss="modal"
+            >
+              Cancel
+            </button>
+            <button type="submit" class="btn btn-primary btn-sm">
+              Save user
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Handover Modal -->
+  <div
+    class="modal fade"
+    id="handoverModal"
+    tabindex="-1"
+  >
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <form id="handover-form">
+          <div class="modal-header py-2">
+            <h6 class="modal-title" id="handoverModalLabel">
+              New Handover
+            </h6>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div class="row g-2">
+              <div class="col-6 col-md-3">
+                <label class="form-label">ID</label>
+                <input
+                  type="text"
+                  id="handover-id"
+                  class="form-control form-control-sm"
+                  readonly
+                />
+              </div>
+              <div class="col-6 col-md-3">
+                <label class="form-label">Date</label>
+                <input
+                  type="date"
+                  id="handover-date"
+                  class="form-control form-control-sm"
+                  required
+                />
+              </div>
+              <div class="col-6 col-md-3">
+                <label class="form-label">From</label>
+                <select
+                  id="handover-from"
+                  class="form-select form-select-sm"
+                >
+                  <option value="">-- Select --</option>
+                </select>
+              </div>
+              <div class="col-6 col-md-3">
+                <label class="form-label">To</label>
+                <select
+                  id="handover-to"
+                  class="form-select form-select-sm"
+                >
+                  <option value="">-- Select --</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label">Items / description</label>
+                <input
+                  type="text"
+                  id="handover-items"
+                  class="form-control form-control-sm"
+                  required
+                />
+              </div>
+              <div class="col-12">
+                <label class="form-label">Long description</label>
+                <textarea
+                  id="handover-long-desc"
+                  rows="3"
+                  class="form-control form-control-sm"
+                ></textarea>
+              </div>
+              <div class="col-6 col-md-3">
+                <label class="form-label">Status</label>
+                <select
+                  id="handover-status"
+                  class="form-select form-select-sm"
+                >
+                  <option value="Pending">Pending</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Delayed">Delayed</option>
+                </select>
+              </div>
+              <div class="col-6 col-md-3">
+                <label class="form-label">Action by</label>
+                <select
+                  id="handover-action-by"
+                  class="form-select form-select-sm"
+                >
+                  <option value="">-- Select --</option>
+                </select>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Attachment (optional)</label>
+                <input
+                  type="file"
+                  id="handover-attachment"
+                  class="form-control form-control-sm"
+                  accept="image/*,application/pdf"
+                />
+                <div
+                  id="handover-attachment-info"
+                  class="small text-muted mt-1"
+                ></div>
+                <div id="handover-attachment-preview" class="mt-2"></div>
+                <button
+                  id="btn-download-attachment"
+                  type="button"
+                  class="btn btn-outline-secondary btn-sm mt-2 d-none"
+                >
+                  Download attachment
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer py-2">
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              data-bs-dismiss="modal"
+            >
+              Close
+            </button>
+            <button type="submit" class="btn btn-primary btn-sm">
+              Save handover
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account Modal -->
+  <div
+    class="modal fade"
+    id="accountModal"
+    tabindex="-1"
+  >
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <form id="account-form">
+          <div class="modal-header py-2">
+            <h6 class="modal-title" id="accountModalLabel">
+              Add Account
+            </h6>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-2">
+              <label class="form-label">Username</label>
+              <input
+                type="text"
+                id="account-username"
+                class="form-control form-control-sm"
+                required
+              />
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Employee</label>
+              <select
+                id="account-employee"
+                class="form-select form-select-sm"
+              >
+                <option value="">-- Select employee --</option>
+              </select>
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Role</label>
+              <select
+                id="account-role"
+                class="form-select form-select-sm"
+              >
+                <option value="Admin">Admin</option>
+                <option value="User">User</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Status</label>
+              <select
+                id="account-status"
+                class="form-select form-select-sm"
+              >
+                <option value="Active">Active</option>
+                <option value="Disabled">Disabled</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer py-2">
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              data-bs-dismiss="modal"
+            >
+              Cancel
+            </button>
+            <button type="submit" class="btn btn-primary btn-sm">
+              Save account
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+    defer
+  ></script>
+
+  <!-- Chart.js -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
+    defer
+  ></script>
+
+  <!-- App Script -->
+  <script defer>
+    // Simple admin flag
+    const IS_ADMIN = true;
+    const MAX_ATTACHMENT_SIZE = 3 * 1024 * 1024; // ~3MB
+
+    // ===== Data & Storage =====
+    const defaultUsers = [
+      {
+        name: "Sameer Jabbar",
+        role: "Manager",
+        email: "sameer_jabbar@yahoo.com",
+      },
+      { name: "Ardasher A. Ahmad", role: "Supervisor", email: "" },
     ];
 
-    const userNames = users.map((u) => u.name).filter(Boolean);
-    selectFields.forEach((select) => {
-      if (!select) return;
-      const currentValue = select.value;
-      select.innerHTML = '<option value="">-- Select --</option>';
-      userNames.forEach((name) => {
-        const opt = document.createElement("option");
-        opt.value = name;
-        opt.textContent = name;
-        select.appendChild(opt);
-      });
-      if (currentValue && userNames.includes(currentValue)) {
-        select.value = currentValue;
-      }
-    });
-  }
-
-  // ===== Handovers Table =====
-  const tableBody = document.getElementById("handover-table-body");
-  const noDataRow = document.getElementById("no-data-row");
-
-  function renderTable() {
-    if (!tableBody) return;
-    tableBody.innerHTML = "";
-
-    if (!filteredHandovers || filteredHandovers.length === 0) {
-      if (noDataRow) noDataRow.style.display = "";
-      return;
-    }
-
-    if (noDataRow) noDataRow.style.display = "none";
-
-    filteredHandovers.forEach((h) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${h.id || ""}</td>
-        <td>${h.from || ""}</td>
-        <td>${h.to || ""}</td>
-        <td>${h.items || ""}</td>
-        <td>${h.status || ""}</td>
-        <td>${formatDate(h.date)}</td>
-        <td>${h.actionBy || ""}</td>
-        <td>
-          <button class="btn btn-sm btn-outline-secondary btn-view" data-id="${h.id}">
-            View
-          </button>
-        </td>
-      `;
-      const btnView = tr.querySelector(".btn-view");
-      btnView.addEventListener("click", () => openViewHandoverModal(h.id));
-      tableBody.appendChild(tr);
-    });
-  }
-
-  function applyFilters() {
-    const fromDate = document.getElementById("filter-from").value;
-    const toDate = document.getElementById("filter-to").value;
-    const status = document.getElementById("filter-status").value;
-    const userValue = document.getElementById("filter-user").value;
-    const dateFrom = document.getElementById("filter-date-from").value;
-    const searchText = document
-      .getElementById("filter-search")
-      .value.toLowerCase()
-      .trim();
-
-    filteredHandovers = handovers.filter((h) => {
-      let ok = true;
-
-      if (fromDate) {
-        ok = ok && h.date >= fromDate;
-      }
-      if (toDate) {
-        ok = ok && h.date <= toDate;
-      }
-      if (dateFrom) {
-        ok = ok && h.date >= dateFrom;
-      }
-      if (status) {
-        ok = ok && h.status === status;
-      }
-      if (userValue) {
-        ok = ok && (h.actionBy === userValue || h.from === userValue || h.to === userValue);
-      }
-      if (searchText) {
-        const textCombined = `${h.id} ${h.from} ${h.to} ${h.items} ${h.status} ${h.actionBy}`
-          .toLowerCase();
-        ok = ok && textCombined.includes(searchText);
-      }
-      return ok;
-    });
-
-    renderTable();
-    renderReports();
-  }
-
-  function resetFilters() {
-    document.getElementById("filter-from").value = "";
-    document.getElementById("filter-to").value = "";
-    document.getElementById("filter-status").value = "";
-    document.getElementById("filter-user").value = "";
-    document.getElementById("filter-date-from").value = "";
-    document.getElementById("filter-search").value = "";
-
-    filteredHandovers = [...handovers];
-    renderTable();
-    renderReports();
-  }
-
-  // ===== Handover Modal =====
-  const handoverModalEl = document.getElementById("handoverModal");
-  const handoverModal = new bootstrap.Modal(handoverModalEl, {});
-  const handoverForm = document.getElementById("handover-form");
-  const handoverIdField = document.getElementById("handover-id");
-  const handoverFromField = document.getElementById("handover-from");
-  const handoverToField = document.getElementById("handover-to");
-  const handoverItemsField = document.getElementById("handover-items");
-  const handoverLongDescField = document.getElementById("handover-long-desc");
-  const handoverStatusField = document.getElementById("handover-status");
-  const handoverDateField = document.getElementById("handover-date");
-  const handoverActionByField = document.getElementById("handover-action-by");
-  const attachmentInput = document.getElementById("handover-attachment");
-  const attachmentPreview = document.getElementById("handover-attachment-preview");
-  const attachmentInfoText = document.getElementById("handover-attachment-info");
-  const btnAddHandover = document.getElementById("btn-add-handover");
-  const btnDownloadAttachment = document.getElementById("btn-download-attachment");
-
-  let editingHandoverId = null;
-
-  function initHandoverModal() {
-    if (!btnAddHandover) return;
-
-    btnAddHandover.addEventListener("click", () => {
-      editingHandoverId = null;
-      handoverForm.reset();
-      attachmentPreview.innerHTML = "";
-      attachmentInfoText.textContent = "";
-      document.getElementById("handoverModalLabel").textContent =
-        "New Handover";
-      handoverIdField.value = generateId("HNDR");
-      handoverDateField.value = new Date().toISOString().slice(0, 10);
-      handoverStatusField.value = "Pending";
-      handoverModal.show();
-    });
-
-    handoverForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const data = {
-        id: handoverIdField.value.trim() || generateId("HNDR"),
-        from: handoverFromField.value || "",
-        to: handoverToField.value || "",
-        items: handoverItemsField.value || "",
-        longDescription: handoverLongDescField.value || "",
-        status: handoverStatusField.value || "Pending",
-        date: handoverDateField.value || new Date().toISOString().slice(0, 10),
-        actionBy: handoverActionByField.value || "",
+    const defaultHandovers = [
+      {
+        id: "HNDR-001",
+        from: "Sameer Jabbar",
+        to: "Ardasher A. Ahmad",
+        items: "120 cartons of Product A",
+        longDescription: "",
+        status: "Pending",
+        date: "2025-11-20",
+        actionBy: "Sameer Jabbar",
         attachmentName: null,
         attachmentType: null,
         attachmentSize: null,
         attachmentDataUrl: null,
-      };
+      },
+      {
+        id: "HNDR-002",
+        from: "Sameer Jabbar",
+        to: "Ardasher A. Ahmad",
+        items: "45 pallets of Product B",
+        longDescription: "",
+        status: "Completed",
+        date: "2025-11-21",
+        actionBy: "Sameer Jabbar",
+        attachmentName: null,
+        attachmentType: null,
+        attachmentSize: null,
+        attachmentDataUrl: null,
+      },
+    ];
 
-      const file = attachmentInput.files[0];
-      if (file) {
-        if (file.size > MAX_ATTACHMENT_SIZE) {
-          alert("Attachment is too large. Please select a file under 3MB.");
+    const defaultAccounts = [
+      {
+        username: "admin",
+        employeeName: "Sameer Jabbar",
+        role: "Admin",
+        status: "Active",
+      },
+    ];
+
+    let users = [];
+    let handovers = [];
+    let filteredHandovers = [];
+    let accounts = [];
+
+    function saveUsers() {
+      localStorage.setItem("warehouseUsers", JSON.stringify(users));
+    }
+
+    function loadUsers() {
+      const stored = localStorage.getItem("warehouseUsers");
+      if (stored) {
+        try {
+          users = JSON.parse(stored);
+        } catch {
+          users = [...defaultUsers];
+        }
+      } else {
+        users = [...defaultUsers];
+      }
+    }
+
+    function saveHandovers() {
+      localStorage.setItem("warehouseHandovers", JSON.stringify(handovers));
+    }
+
+    function loadHandovers() {
+      const stored = localStorage.getItem("warehouseHandovers");
+      if (stored) {
+        try {
+          handovers = JSON.parse(stored);
+        } catch {
+          handovers = [...defaultHandovers];
+        }
+      } else {
+        handovers = [...defaultHandovers];
+      }
+      filteredHandovers = [...handovers];
+    }
+
+    function saveAccounts() {
+      localStorage.setItem("warehouseAccounts", JSON.stringify(accounts));
+    }
+
+    function loadAccounts() {
+      const stored = localStorage.getItem("warehouseAccounts");
+      if (stored) {
+        try {
+          accounts = JSON.parse(stored);
+        } catch {
+          accounts = [...defaultAccounts];
+        }
+      } else {
+        accounts = [...defaultAccounts];
+      }
+    }
+
+    // ===== Utilities =====
+    function formatDate(dateStr) {
+      if (!dateStr) return "";
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString("en-GB", {
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+      });
+    }
+
+    function generateId(prefix = "HNDR") {
+      const num = handovers.length + 1;
+      return `${prefix}-${String(num).padStart(3, "0")}`;
+    }
+
+    function setActiveView(viewName, persist = true) {
+      document
+        .querySelectorAll(".sidebar-item")
+        .forEach((item) => item.classList.remove("active"));
+
+      const activeSidebarItem = document.querySelector(
+        `.sidebar-item[data-view="${viewName}"]`
+      );
+      if (activeSidebarItem) {
+        activeSidebarItem.classList.add("active");
+      }
+
+      document
+        .querySelectorAll(".view-section")
+        .forEach((sec) => sec.classList.add("d-none"));
+      const viewSection = document.querySelector(
+        `.view-section[data-view="${viewName}"]`
+      );
+      if (viewSection) {
+        viewSection.classList.remove("d-none");
+      }
+
+      if (persist) {
+        localStorage.setItem("warehouseActiveView", viewName);
+      }
+
+      if (viewName === "dashboard" || viewName === "reports") {
+        renderReports();
+      }
+    }
+
+    // ===== Sidebar Navigation =====
+    function initSidebarNavigation() {
+      document.querySelectorAll(".sidebar-item").forEach((item) => {
+        item.addEventListener("click", () => {
+          const view = item.getAttribute("data-view");
+          setActiveView(view);
+        });
+      });
+
+      const logo = document.getElementById("sidebar-logo");
+      if (logo) {
+        logo.addEventListener("click", () => setActiveView("dashboard"));
+      }
+    }
+
+    // ===== Users Management =====
+    const usersTableBody = document.getElementById("users-table-body");
+    const userForm = document.getElementById("user-form");
+    const userNameInput = document.getElementById("user-name");
+    const userRoleInput = document.getElementById("user-role");
+    const userEmailInput = document.getElementById("user-email");
+    const userModal = new bootstrap.Modal(
+      document.getElementById("userModal"),
+      {}
+    );
+    const userModalTitle = document.getElementById("userModalLabel");
+    let isEditUser = false;
+    let editingUserIndex = null;
+
+    function renderUsers() {
+      if (!usersTableBody) return;
+      usersTableBody.innerHTML = "";
+      if (!users || users.length === 0) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 4;
+        td.className = "text-center text-muted";
+        td.textContent = "No users found. Please add a user.";
+        tr.appendChild(td);
+        usersTableBody.appendChild(tr);
+        return;
+      }
+
+      users.forEach((u, index) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${u.name || ""}</td>
+          <td>${u.role || ""}</td>
+          <td>${u.email || ""}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-secondary me-1" data-index="${index}">
+              Edit
+            </button>
+            <button class="btn btn-sm btn-outline-danger" data-index="${index}">
+              Delete
+            </button>
+          </td>
+        `;
+        const [editBtn, deleteBtn] = tr.querySelectorAll("button");
+
+        editBtn.addEventListener("click", () => {
+          isEditUser = true;
+          editingUserIndex = index;
+          userModalTitle.textContent = "Edit User";
+          userNameInput.value = u.name || "";
+          userRoleInput.value = u.role || "";
+          userEmailInput.value = u.email || "";
+          userModal.show();
+        });
+
+        deleteBtn.addEventListener("click", () => {
+          if (
+            confirm(
+              `Are you sure you want to delete user "${
+                u.name || "Unnamed"
+              }"?`
+            )
+          ) {
+            users.splice(index, 1);
+            saveUsers();
+            renderUsers();
+            refreshUserSelectOptions();
+          }
+        });
+
+        usersTableBody.appendChild(tr);
+      });
+    }
+
+    function initUserModal() {
+      const btnAddUser = document.getElementById("btn-add-user");
+      if (!btnAddUser || !userForm) return;
+
+      btnAddUser.addEventListener("click", () => {
+        isEditUser = false;
+        editingUserIndex = null;
+        userModalTitle.textContent = "Add User";
+        userForm.reset();
+        userModal.show();
+      });
+
+      userForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const name = userNameInput.value.trim();
+        const role = userRoleInput.value.trim();
+        const email = userEmailInput.value.trim();
+
+        if (!name) {
+          alert("Name is required");
           return;
         }
-        const reader = new FileReader();
-        reader.onload = function (evt) {
-          data.attachmentName = file.name;
-          data.attachmentType = file.type;
-          data.attachmentSize = file.size;
-          data.attachmentDataUrl = evt.target.result;
-          saveHandoverData(data);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        saveHandoverData(data);
-      }
-    });
 
-    attachmentInput.addEventListener("change", () => {
-      const file = attachmentInput.files[0];
-      if (!file) {
-        attachmentPreview.innerHTML = "";
-        attachmentInfoText.textContent = "";
+        const newUser = { name, role, email };
+
+        if (isEditUser && editingUserIndex !== null) {
+          users[editingUserIndex] = newUser;
+        } else {
+          users.push(newUser);
+        }
+
+        saveUsers();
+        renderUsers();
+        refreshUserSelectOptions();
+        userModal.hide();
+      });
+    }
+
+    function initUserForm() {
+      if (!userForm) return;
+    }
+
+    function refreshUserSelectOptions() {
+      const selectFields = [
+        document.getElementById("handover-from"),
+        document.getElementById("handover-to"),
+        document.getElementById("handover-action-by"),
+        document.getElementById("account-employee"),
+        document.getElementById("filter-user"),
+      ];
+
+      const userNames = users.map((u) => u.name).filter(Boolean);
+      selectFields.forEach((select) => {
+        if (!select) return;
+        const currentValue = select.value;
+        select.innerHTML = '<option value="">-- Select --</option>';
+        userNames.forEach((name) => {
+          const opt = document.createElement("option");
+          opt.value = name;
+          opt.textContent = name;
+          select.appendChild(opt);
+        });
+        if (currentValue && userNames.includes(currentValue)) {
+          select.value = currentValue;
+        }
+      });
+    }
+
+    // ===== Handovers Table =====
+    const tableBody = document.getElementById("handover-table-body");
+    const noDataRow = document.getElementById("no-data-row");
+
+    function renderTable() {
+      if (!tableBody) return;
+      tableBody.innerHTML = "";
+
+      if (!filteredHandovers || filteredHandovers.length === 0) {
+        if (noDataRow) noDataRow.style.display = "";
         return;
       }
 
-      if (file.size > MAX_ATTACHMENT_SIZE) {
-        alert("Attachment is too large. Please select a file under 3MB.");
-        attachmentInput.value = "";
-        attachmentPreview.innerHTML = "";
-        attachmentInfoText.textContent = "";
-        return;
-      }
+      if (noDataRow) noDataRow.style.display = "none";
 
-      attachmentInfoText.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-
-      if (file.type.startsWith("image/")) {
-        const img = document.createElement("img");
-        img.className = "img-fluid mt-2 rounded border";
-        img.style.maxHeight = "240px";
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          img.src = evt.target.result;
-        };
-        reader.readAsDataURL(file);
-        attachmentPreview.innerHTML = "";
-        attachmentPreview.appendChild(img);
-      } else {
-        attachmentPreview.innerHTML = "";
-      }
-    });
-  }
-
-  function saveHandoverData(data) {
-    if (editingHandoverId) {
-      const index = handovers.findIndex((h) => h.id === editingHandoverId);
-      if (index !== -1) {
-        handovers[index] = data;
-      }
-    } else {
-      handovers.push(data);
+      filteredHandovers.forEach((h) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${h.id || ""}</td>
+          <td>${h.from || ""}</td>
+          <td>${h.to || ""}</td>
+          <td>${h.items || ""}</td>
+          <td>${h.status || ""}</td>
+          <td>${formatDate(h.date)}</td>
+          <td>${h.actionBy || ""}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-secondary btn-view" data-id="${h.id}">
+              View
+            </button>
+          </td>
+        `;
+        const btnView = tr.querySelector(".btn-view");
+        btnView.addEventListener("click", () => openViewHandoverModal(h.id));
+        tableBody.appendChild(tr);
+      });
     }
 
-    saveHandovers();
-    filteredHandovers = [...handovers];
-    renderTable();
-    renderReports();
-    handoverModal.hide();
-  }
+    function applyFilters() {
+      const fromDateEl = document.getElementById("filter-from");
+      const toDateEl = document.getElementById("filter-to");
+      const statusEl = document.getElementById("filter-status");
+      const userEl = document.getElementById("filter-user");
+      const dateFromEl = document.getElementById("filter-date-from");
+      const searchEl = document.getElementById("filter-search");
 
-  function openViewHandoverModal(id) {
-    const h = handovers.find((x) => x.id === id);
-    if (!h) return;
+      const fromDate = fromDateEl ? fromDateEl.value : "";
+      const toDate = toDateEl ? toDateEl.value : "";
+      const status = statusEl ? statusEl.value : "";
+      const userValue = userEl ? userEl.value : "";
+      const dateFrom = dateFromEl ? dateFromEl.value : "";
+      const searchText = searchEl
+        ? searchEl.value.toLowerCase().trim()
+        : "";
 
-    editingHandoverId = id;
+      filteredHandovers = handovers.filter((h) => {
+        let ok = true;
 
-    document.getElementById("handoverModalLabel").textContent =
-      "View / Edit Handover";
-
-    handoverIdField.value = h.id || "";
-    handoverFromField.value = h.from || "";
-    handoverToField.value = h.to || "";
-    handoverItemsField.value = h.items || "";
-    handoverLongDescField.value = h.longDescription || "";
-    handoverStatusField.value = h.status || "Pending";
-    handoverDateField.value = h.date || "";
-    handoverActionByField.value = h.actionBy || "";
-
-    attachmentInput.value = "";
-    attachmentPreview.innerHTML = "";
-    attachmentInfoText.textContent = "";
-
-    if (h.attachmentName && h.attachmentDataUrl) {
-      attachmentInfoText.textContent = `${h.attachmentName} (${h.attachmentSize ? (h.attachmentSize / 1024).toFixed(1) + " KB" : ""})`;
-
-      if (h.attachmentType && h.attachmentType.startsWith("image/")) {
-        const img = document.createElement("img");
-        img.className = "img-fluid mt-2 rounded border";
-        img.style.maxHeight = "240px";
-        img.src = h.attachmentDataUrl;
-        attachmentPreview.appendChild(img);
-      }
-      if (btnDownloadAttachment) {
-        btnDownloadAttachment.classList.remove("d-none");
-        btnDownloadAttachment.onclick = () =>
-          downloadAttachment(h.attachmentName, h.attachmentDataUrl);
-      }
-    } else {
-      if (btnDownloadAttachment) {
-        btnDownloadAttachment.classList.add("d-none");
-      }
-    }
-
-    handoverModal.show();
-  }
-
-  function downloadAttachment(fileName, dataUrl) {
-    const a = document.createElement("a");
-    a.href = dataUrl;
-    a.download = fileName || "attachment";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }
-
-  // ===== Dashboard Stats & Charts =====
-  function renderReports() {
-    const totalSpan = document.getElementById("rep-total");
-    const completedSpan = document.getElementById("rep-completed");
-    const pendingSpan = document.getElementById("rep-pending");
-    const delayedSpan = document.getElementById("rep-delayed");
-
-    const total = handovers.length;
-    const completed = handovers.filter((h) => h.status === "Completed").length;
-    const pending = handovers.filter((h) => h.status === "Pending").length;
-    const delayed = handovers.filter((h) => h.status === "Delayed").length;
-
-    if (totalSpan) totalSpan.textContent = total;
-    if (completedSpan) completedSpan.textContent = completed;
-    if (pendingSpan) pendingSpan.textContent = pending;
-    if (delayedSpan) delayedSpan.textContent = delayed;
-
-    const statusCtx = document
-      .getElementById("statusChart")
-      ?.getContext("2d");
-    const userCtx = document
-      .getElementById("userChart")
-      ?.getContext("2d");
-
-    if (!statusCtx || !userCtx) return;
-
-    const statusCounts = {
-      Pending: pending,
-      Completed: completed,
-      Delayed: delayed,
-    };
-
-    const countsByUser = {};
-    handovers.forEach((h) => {
-      const key = h.actionBy || h.from || "Unknown";
-      countsByUser[key] = (countsByUser[key] || 0) + 1;
-    });
-
-    if (window.statusChartInstance) {
-      window.statusChartInstance.destroy();
-    }
-    if (window.userChartInstance) {
-      window.userChartInstance.destroy();
-    }
-
-    window.statusChartInstance = new Chart(statusCtx, {
-      type: "pie",
-      data: {
-        labels: Object.keys(statusCounts),
-        datasets: [
-          {
-            data: Object.values(statusCounts),
-          },
-        ],
-      },
-      options: {
-        plugins: {
-          legend: {
-            position: "bottom",
-          },
-        },
-      },
-    });
-
-    window.userChartInstance = new Chart(userCtx, {
-      type: "bar",
-      data: {
-        labels: Object.keys(countsByUser),
-        datasets: [
-          {
-            data: Object.values(countsByUser),
-          },
-        ],
-      },
-      options: {
-        plugins: {
-          legend: {
-            display: false,
-          },
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: {
-              stepSize: 1,
-            },
-          },
-        },
-      },
-    });
-  }
-
-  // ===== Accounts Management =====
-  const accountTableBody = document.getElementById("accounts-table-body");
-  const accountForm = document.getElementById("account-form");
-  const accountUsernameInput = document.getElementById("account-username");
-  const accountEmployeeSelect = document.getElementById("account-employee");
-  const accountRoleSelect = document.getElementById("account-role");
-  const accountStatusSelect = document.getElementById("account-status");
-  const accountModal = new bootstrap.Modal(
-    document.getElementById("accountModal"),
-    {}
-  );
-  const accountModalTitle = document.getElementById("accountModalLabel");
-  let isEditAccount = false;
-  let editingAccountIndex = null;
-
-  function fillAccountEmployeeOptions() {
-    if (!accountEmployeeSelect) return;
-    const current = accountEmployeeSelect.value;
-    accountEmployeeSelect.innerHTML =
-      '<option value="">-- Select employee --</option>';
-    users.forEach((u) => {
-      const opt = document.createElement("option");
-      opt.value = u.name;
-      opt.textContent = u.name;
-      accountEmployeeSelect.appendChild(opt);
-    });
-    if (current) accountEmployeeSelect.value = current;
-  }
-
-  function renderAccounts() {
-    if (!accountTableBody) return;
-    accountTableBody.innerHTML = "";
-
-    if (!accounts || accounts.length === 0) {
-      const tr = document.createElement("tr");
-      const td = document.createElement("td");
-      td.colSpan = 5;
-      td.className = "text-center text-muted";
-      td.textContent = "No accounts found. Please add an account.";
-      tr.appendChild(td);
-      accountTableBody.appendChild(tr);
-      return;
-    }
-
-    accounts.forEach((acc, index) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${acc.username || ""}</td>
-        <td>${acc.employeeName || ""}</td>
-        <td>${acc.role || ""}</td>
-        <td>${acc.status || ""}</td>
-        <td>
-          <button class="btn btn-sm btn-outline-secondary me-1" data-index="${index}">
-            Edit
-          </button>
-          <button class="btn btn-sm btn-outline-danger" data-index="${index}">
-            Delete
-          </button>
-        </td>
-      `;
-      const [editBtn, deleteBtn] = tr.querySelectorAll("button");
-
-      editBtn.addEventListener("click", () => {
-        isEditAccount = true;
-        editingAccountIndex = index;
-        accountModalTitle.textContent = "Edit Account";
-        accountUsernameInput.value = acc.username;
-        accountEmployeeSelect.value = acc.employeeName || "";
-        accountRoleSelect.value = acc.role || "User";
-        accountStatusSelect.value = acc.status || "Active";
-        accountModal.show();
+        if (fromDate) {
+          ok = ok && h.date >= fromDate;
+        }
+        if (toDate) {
+          ok = ok && h.date <= toDate;
+        }
+        if (dateFrom) {
+          ok = ok && h.date >= dateFrom;
+        }
+        if (status) {
+          ok = ok && h.status === status;
+        }
+        if (userValue) {
+          ok =
+            ok &&
+            (h.actionBy === userValue ||
+              h.from === userValue ||
+              h.to === userValue);
+        }
+        if (searchText) {
+          const textCombined = `${h.id} ${h.from} ${h.to} ${h.items} ${
+            h.status
+          } ${h.actionBy}`.toLowerCase();
+          ok = ok && textCombined.includes(searchText);
+        }
+        return ok;
       });
 
-      deleteBtn.addEventListener("click", () => {
-        if (
-          confirm(
-            `Are you sure you want to delete account "${acc.username || ""}"?`
-          )
-        ) {
-          accounts.splice(index, 1);
-          saveAccounts();
-          renderAccounts();
+      renderTable();
+      renderReports();
+    }
+
+    function resetFilters() {
+      const fromEl = document.getElementById("filter-from");
+      const toEl = document.getElementById("filter-to");
+      const statusEl = document.getElementById("filter-status");
+      const userEl = document.getElementById("filter-user");
+      const dateFromEl = document.getElementById("filter-date-from");
+      const searchEl = document.getElementById("filter-search");
+
+      if (fromEl) fromEl.value = "";
+      if (toEl) toEl.value = "";
+      if (statusEl) statusEl.value = "";
+      if (userEl) userEl.value = "";
+      if (dateFromEl) dateFromEl.value = "";
+      if (searchEl) searchEl.value = "";
+
+      filteredHandovers = [...handovers];
+      renderTable();
+      renderReports();
+    }
+
+    // ===== Handover Modal =====
+    const handoverModalEl = document.getElementById("handoverModal");
+    const handoverModal = new bootstrap.Modal(handoverModalEl, {});
+    const handoverForm = document.getElementById("handover-form");
+    const handoverIdField = document.getElementById("handover-id");
+    const handoverFromField = document.getElementById("handover-from");
+    const handoverToField = document.getElementById("handover-to");
+    const handoverItemsField = document.getElementById("handover-items");
+    const handoverLongDescField =
+      document.getElementById("handover-long-desc");
+    const handoverStatusField = document.getElementById("handover-status");
+    const handoverDateField = document.getElementById("handover-date");
+    const handoverActionByField =
+      document.getElementById("handover-action-by");
+    const attachmentInput = document.getElementById("handover-attachment");
+    const attachmentPreview = document.getElementById(
+      "handover-attachment-preview"
+    );
+    const attachmentInfoText = document.getElementById(
+      "handover-attachment-info"
+    );
+    const btnAddHandover = document.getElementById("btn-add-handover");
+    const btnDownloadAttachment = document.getElementById(
+      "btn-download-attachment"
+    );
+
+    let editingHandoverId = null;
+
+    function initHandoverModal() {
+      if (!btnAddHandover || !handoverForm) return;
+
+      btnAddHandover.addEventListener("click", () => {
+        editingHandoverId = null;
+        handoverForm.reset();
+        if (attachmentPreview) attachmentPreview.innerHTML = "";
+        if (attachmentInfoText) attachmentInfoText.textContent = "";
+        document.getElementById("handoverModalLabel").textContent =
+          "New Handover";
+        handoverIdField.value = generateId("HNDR");
+        handoverDateField.value =
+          new Date().toISOString().slice(0, 10);
+        handoverStatusField.value = "Pending";
+        handoverModal.show();
+      });
+
+      handoverForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const data = {
+          id: handoverIdField.value.trim() || generateId("HNDR"),
+          from: handoverFromField.value || "",
+          to: handoverToField.value || "",
+          items: handoverItemsField.value || "",
+          longDescription: handoverLongDescField.value || "",
+          status: handoverStatusField.value || "Pending",
+          date:
+            handoverDateField.value ||
+            new Date().toISOString().slice(0, 10),
+          actionBy: handoverActionByField.value || "",
+          attachmentName: null,
+          attachmentType: null,
+          attachmentSize: null,
+          attachmentDataUrl: null,
+        };
+
+        const file = attachmentInput.files[0];
+        if (file) {
+          if (file.size > MAX_ATTACHMENT_SIZE) {
+            alert(
+              "Attachment is too large. Please select a file under 3MB."
+            );
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = function (evt) {
+            data.attachmentName = file.name;
+            data.attachmentType = file.type;
+            data.attachmentSize = file.size;
+            data.attachmentDataUrl = evt.target.result;
+            saveHandoverData(data);
+          };
+          reader.readAsDataURL(file);
+        } else {
+          saveHandoverData(data);
         }
       });
 
-      accountTableBody.appendChild(tr);
-    });
-  }
+      if (attachmentInput) {
+        attachmentInput.addEventListener("change", () => {
+          const file = attachmentInput.files[0];
+          if (!file) {
+            if (attachmentPreview) attachmentPreview.innerHTML = "";
+            if (attachmentInfoText) attachmentInfoText.textContent = "";
+            return;
+          }
 
-  function initAccountModal() {
-    const btnAdd = document.getElementById("btn-add-account");
-    if (!btnAdd || !accountForm) return;
+          if (file.size > MAX_ATTACHMENT_SIZE) {
+            alert(
+              "Attachment is too large. Please select a file under 3MB."
+            );
+            attachmentInput.value = "";
+            if (attachmentPreview) attachmentPreview.innerHTML = "";
+            if (attachmentInfoText) attachmentInfoText.textContent = "";
+            return;
+          }
 
-    btnAdd.addEventListener("click", () => {
-      isEditAccount = false;
-      editingAccountIndex = null;
-      accountForm.reset();
-      fillAccountEmployeeOptions();
-      accountStatusSelect.value = "Active";
-      accountModal.show();
-    });
+          if (attachmentInfoText) {
+            attachmentInfoText.textContent = `${file.name} (${(
+              file.size / 1024
+            ).toFixed(1)} KB)`;
+          }
 
-    accountForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const username = accountUsernameInput.value.trim();
-      const employeeName = accountEmployeeSelect.value || "";
-      const role = accountRoleSelect.value || "User";
-      const status = accountStatusSelect.value || "Active";
-
-      if (!username) {
-        alert("Username is required");
-        return;
+          if (file.type.startsWith("image/")) {
+            const img = document.createElement("img");
+            img.className = "img-fluid mt-2 rounded border";
+            img.style.maxHeight = "240px";
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+              img.src = evt.target.result;
+            };
+            reader.readAsDataURL(file);
+            if (attachmentPreview) {
+              attachmentPreview.innerHTML = "";
+              attachmentPreview.appendChild(img);
+            }
+          } else {
+            if (attachmentPreview) attachmentPreview.innerHTML = "";
+          }
+        });
       }
-      if (!employeeName) {
-        alert("Employee is required");
-        return;
-      }
-
-      const newAccount = {
-        username,
-        employeeName,
-        role,
-        status,
-      };
-
-      if (isEditAccount && editingAccountIndex !== null) {
-        accounts[editingAccountIndex] = newAccount;
-      } else {
-        accounts.push(newAccount);
-      }
-
-      saveAccounts();
-      renderAccounts();
-      accountModal.hide();
-    });
-  }
-
-  // ===== Admin Tools (Export / Import / Clear) =====
-  function initAdminTools() {
-    const adminTools = document.getElementById("admin-tools");
-    if (!adminTools) return;
-
-    // If user is not admin, hide the whole group
-    if (!IS_ADMIN) {
-      adminTools.classList.add("d-none");
-      return;
     }
 
-    initExportJson();
-    initImportJson();
-    initClearData();
-  }
+    function saveHandoverData(data) {
+      if (editingHandoverId) {
+        const index = handovers.findIndex(
+          (h) => h.id === editingHandoverId
+        );
+        if (index !== -1) {
+          handovers[index] = data;
+        }
+      } else {
+        handovers.push(data);
+      }
 
-  // ===== Export JSON =====
-  function initExportJson() {
-    const btn = document.getElementById("btn-export-json");
-    if (!btn) return;
-    btn.addEventListener("click", () => {
-      const data = {
-        exportedAt: new Date().toISOString(),
-        handovers,
-        users,
-        accounts,
-      };
-      const blob = new Blob([JSON.stringify(data, null, 2)], {
-        type: "application/json",
-      });
-      const url = URL.createObjectURL(blob);
+      saveHandovers();
+      filteredHandovers = [...handovers];
+      renderTable();
+      renderReports();
+      handoverModal.hide();
+    }
+
+    function openViewHandoverModal(id) {
+      const h = handovers.find((x) => x.id === id);
+      if (!h) return;
+
+      editingHandoverId = id;
+
+      document.getElementById("handoverModalLabel").textContent =
+        "View / Edit Handover";
+
+      handoverIdField.value = h.id || "";
+      handoverFromField.value = h.from || "";
+      handoverToField.value = h.to || "";
+      handoverItemsField.value = h.items || "";
+      handoverLongDescField.value = h.longDescription || "";
+      handoverStatusField.value = h.status || "Pending";
+      handoverDateField.value = h.date || "";
+      handoverActionByField.value = h.actionBy || "";
+
+      if (attachmentInput) attachmentInput.value = "";
+      if (attachmentPreview) attachmentPreview.innerHTML = "";
+      if (attachmentInfoText) attachmentInfoText.textContent = "";
+
+      if (h.attachmentName && h.attachmentDataUrl) {
+        if (attachmentInfoText) {
+          attachmentInfoText.textContent = `${h.attachmentName} ${
+            h.attachmentSize
+              ? `(${(h.attachmentSize / 1024).toFixed(1)} KB)`
+              : ""
+          }`;
+        }
+
+        if (
+          h.attachmentType &&
+          h.attachmentType.startsWith("image/")
+        ) {
+          const img = document.createElement("img");
+          img.className = "img-fluid mt-2 rounded border";
+          img.style.maxHeight = "240px";
+          img.src = h.attachmentDataUrl;
+          if (attachmentPreview) attachmentPreview.appendChild(img);
+        }
+        if (btnDownloadAttachment) {
+          btnDownloadAttachment.classList.remove("d-none");
+          btnDownloadAttachment.onclick = () =>
+            downloadAttachment(
+              h.attachmentName,
+              h.attachmentDataUrl
+            );
+        }
+      } else {
+        if (btnDownloadAttachment) {
+          btnDownloadAttachment.classList.add("d-none");
+        }
+      }
+
+      handoverModal.show();
+    }
+
+    function downloadAttachment(fileName, dataUrl) {
       const a = document.createElement("a");
-      const dateStr = new Date().toISOString().slice(0, 10);
-      a.href = url;
-      a.download = `warehouse-data-${dateStr}.json`;
+      a.href = dataUrl;
+      a.download = fileName || "attachment";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    });
-  }
+    }
 
-  // ===== Import JSON =====
-  function initImportJson() {
-    const btnImport = document.getElementById("btn-import-json");
-    const inputImport = document.getElementById("input-import-json");
-    if (!btnImport || !inputImport) return;
+    // ===== Dashboard Stats & Charts =====
+    function renderReports() {
+      const totalSpan = document.getElementById("rep-total");
+      const completedSpan = document.getElementById("rep-completed");
+      const pendingSpan = document.getElementById("rep-pending");
+      const delayedSpan = document.getElementById("rep-delayed");
 
-    btnImport.addEventListener("click", () => {
-      inputImport.click();
-    });
+      const total = handovers.length;
+      const completed = handovers.filter(
+        (h) => h.status === "Completed"
+      ).length;
+      const pending = handovers.filter(
+        (h) => h.status === "Pending"
+      ).length;
+      const delayed = handovers.filter(
+        (h) => h.status === "Delayed"
+      ).length;
 
-    inputImport.addEventListener("change", async () => {
-      const file = inputImport.files[0];
-      if (!file) return;
+      if (totalSpan) totalSpan.textContent = total;
+      if (completedSpan) completedSpan.textContent = completed;
+      if (pendingSpan) pendingSpan.textContent = pending;
+      if (delayedSpan) delayedSpan.textContent = delayed;
 
-      try {
-        const text = await file.text();
-        const data = JSON.parse(text);
+      const statusCtxList = [];
+      const s1 = document.getElementById("statusChart");
+      const s2 = document.getElementById("statusChart2");
+      if (s1) statusCtxList.push(s1.getContext("2d"));
+      if (s2) statusCtxList.push(s2.getContext("2d"));
 
-        if (
-          !data ||
-          !Array.isArray(data.handovers) ||
-          !Array.isArray(data.users) ||
-          !Array.isArray(data.accounts)
-        ) {
-          alert("Invalid JSON file format. Expected keys: handovers, users, accounts.");
-          inputImport.value = "";
+      const userCtxList = [];
+      const u1 = document.getElementById("userChart");
+      const u2 = document.getElementById("userChart2");
+      if (u1) userCtxList.push(u1.getContext("2d"));
+      if (u2) userCtxList.push(u2.getContext("2d"));
+
+      const statusCounts = {
+        Pending: pending,
+        Completed: completed,
+        Delayed: delayed,
+      };
+
+      const countsByUser = {};
+      handovers.forEach((h) => {
+        const key = h.actionBy || h.from || "Unknown";
+        countsByUser[key] = (countsByUser[key] || 0) + 1;
+      });
+
+      // Destroy previous charts if exist
+      if (!window.chartInstances) window.chartInstances = [];
+      window.chartInstances.forEach((ch) => ch.destroy());
+      window.chartInstances = [];
+
+      statusCtxList.forEach((ctx) => {
+        if (!ctx) return;
+        const chart = new Chart(ctx, {
+          type: "pie",
+          data: {
+            labels: Object.keys(statusCounts),
+            datasets: [
+              {
+                data: Object.values(statusCounts),
+              },
+            ],
+          },
+          options: {
+            plugins: {
+              legend: {
+                position: "bottom",
+              },
+            },
+          },
+        });
+        window.chartInstances.push(chart);
+      });
+
+      userCtxList.forEach((ctx) => {
+        if (!ctx) return;
+        const chart = new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels: Object.keys(countsByUser),
+            datasets: [
+              {
+                data: Object.values(countsByUser),
+              },
+            ],
+          },
+          options: {
+            plugins: {
+              legend: {
+                display: false,
+              },
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  stepSize: 1,
+                },
+              },
+            },
+          },
+        });
+        window.chartInstances.push(chart);
+      });
+    }
+
+    // ===== Accounts Management =====
+    const accountTableBody = document.getElementById(
+      "accounts-table-body"
+    );
+    const accountForm = document.getElementById("account-form");
+    const accountUsernameInput =
+      document.getElementById("account-username");
+    const accountEmployeeSelect =
+      document.getElementById("account-employee");
+    const accountRoleSelect =
+      document.getElementById("account-role");
+    const accountStatusSelect =
+      document.getElementById("account-status");
+    const accountModal = new bootstrap.Modal(
+      document.getElementById("accountModal"),
+      {}
+    );
+    const accountModalTitle =
+      document.getElementById("accountModalLabel");
+    let isEditAccount = false;
+    let editingAccountIndex = null;
+
+    function fillAccountEmployeeOptions() {
+      if (!accountEmployeeSelect) return;
+      const current = accountEmployeeSelect.value;
+      accountEmployeeSelect.innerHTML =
+        '<option value="">-- Select employee --</option>';
+      users.forEach((u) => {
+        const opt = document.createElement("option");
+        opt.value = u.name;
+        opt.textContent = u.name;
+        accountEmployeeSelect.appendChild(opt);
+      });
+      if (current) accountEmployeeSelect.value = current;
+    }
+
+    function renderAccounts() {
+      if (!accountTableBody) return;
+      accountTableBody.innerHTML = "";
+
+      if (!accounts || accounts.length === 0) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 5;
+        td.className = "text-center text-muted";
+        td.textContent = "No accounts found. Please add an account.";
+        tr.appendChild(td);
+        accountTableBody.appendChild(tr);
+        return;
+      }
+
+      accounts.forEach((acc, index) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${acc.username || ""}</td>
+          <td>${acc.employeeName || ""}</td>
+          <td>${acc.role || ""}</td>
+          <td>${acc.status || ""}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-secondary me-1" data-index="${index}">
+              Edit
+            </button>
+            <button class="btn btn-sm btn-outline-danger" data-index="${index}">
+              Delete
+            </button>
+          </td>
+        `;
+        const [editBtn, deleteBtn] = tr.querySelectorAll("button");
+
+        editBtn.addEventListener("click", () => {
+          isEditAccount = true;
+          editingAccountIndex = index;
+          accountModalTitle.textContent = "Edit Account";
+          accountUsernameInput.value = acc.username;
+          accountEmployeeSelect.value = acc.employeeName || "";
+          accountRoleSelect.value = acc.role || "User";
+          accountStatusSelect.value = acc.status || "Active";
+          accountModal.show();
+        });
+
+        deleteBtn.addEventListener("click", () => {
+          if (
+            confirm(
+              `Are you sure you want to delete account "${
+                acc.username || ""
+              }"?`
+            )
+          ) {
+            accounts.splice(index, 1);
+            saveAccounts();
+            renderAccounts();
+          }
+        });
+
+        accountTableBody.appendChild(tr);
+      });
+    }
+
+    function initAccountModal() {
+      const btnAdd = document.getElementById("btn-add-account");
+      if (!btnAdd || !accountForm) return;
+
+      btnAdd.addEventListener("click", () => {
+        isEditAccount = false;
+        editingAccountIndex = null;
+        accountForm.reset();
+        fillAccountEmployeeOptions();
+        accountStatusSelect.value = "Active";
+        accountModal.show();
+      });
+
+      accountForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const username = accountUsernameInput.value.trim();
+        const employeeName = accountEmployeeSelect.value || "";
+        const role = accountRoleSelect.value || "User";
+        const status = accountStatusSelect.value || "Active";
+
+        if (!username) {
+          alert("Username is required");
+          return;
+        }
+        if (!employeeName) {
+          alert("Employee is required");
           return;
         }
 
-        handovers = data.handovers;
-        users = data.users;
-        accounts = data.accounts;
+        const newAccount = {
+          username,
+          employeeName,
+          role,
+          status,
+        };
 
-        saveHandovers();
-        saveUsers();
+        if (isEditAccount && editingAccountIndex !== null) {
+          accounts[editingAccountIndex] = newAccount;
+        } else {
+          accounts.push(newAccount);
+        }
+
         saveAccounts();
+        renderAccounts();
+        accountModal.hide();
+      });
+    }
 
-        filteredHandovers = [...handovers];
+    // ===== Admin Tools (Export / Import / Clear) =====
+    function initAdminTools() {
+      const adminTools = document.getElementById("admin-tools");
+      if (!adminTools) return;
+
+      if (!IS_ADMIN) {
+        adminTools.classList.add("d-none");
+        return;
+      }
+
+      initExportJson();
+      initImportJson();
+      initClearData();
+    }
+
+    function initExportJson() {
+      const btn = document.getElementById("btn-export-json");
+      if (!btn) return;
+      btn.addEventListener("click", () => {
+        const data = {
+          exportedAt: new Date().toISOString(),
+          handovers,
+          users,
+          accounts,
+        };
+        const blob = new Blob([JSON.stringify(data, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const dateStr = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `warehouse-data-${dateStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+    }
+
+    function initImportJson() {
+      const btnImport = document.getElementById("btn-import-json");
+      const inputImport = document.getElementById("input-import-json");
+      if (!btnImport || !inputImport) return;
+
+      btnImport.addEventListener("click", () => {
+        inputImport.click();
+      });
+
+      inputImport.addEventListener("change", async () => {
+        const file = inputImport.files[0];
+        if (!file) return;
+
+        try {
+          const text = await file.text();
+          const data = JSON.parse(text);
+
+          if (
+            !data ||
+            !Array.isArray(data.handovers) ||
+            !Array.isArray(data.users) ||
+            !Array.isArray(data.accounts)
+          ) {
+            alert(
+              "Invalid JSON file format. Expected keys: handovers, users, accounts."
+            );
+            inputImport.value = "";
+            return;
+          }
+
+          handovers = data.handovers;
+          users = data.users;
+          accounts = data.accounts;
+
+          saveHandovers();
+          saveUsers();
+          saveAccounts();
+
+          filteredHandovers = [...handovers];
+          renderUsers();
+          refreshUserSelectOptions();
+          renderAccounts();
+          resetFilters();
+          renderReports();
+
+          alert("JSON data imported successfully.");
+        } catch (err) {
+          console.error(err);
+          alert("Error reading or parsing JSON file.");
+        } finally {
+          inputImport.value = "";
+        }
+      });
+    }
+
+    function initClearData() {
+      const btnClear = document.getElementById("btn-clear-data");
+      if (!btnClear) return;
+
+      btnClear.addEventListener("click", () => {
+        const ok = confirm(
+          "This will delete ALL handovers, users and accounts from this browser. Are you sure?"
+        );
+        if (!ok) return;
+
+        localStorage.removeItem("warehouseHandovers");
+        localStorage.removeItem("warehouseUsers");
+        localStorage.removeItem("warehouseAccounts");
+
+        handovers = [];
+        filteredHandovers = [];
+        users = [];
+        accounts = [];
+
         renderUsers();
         refreshUserSelectOptions();
         renderAccounts();
-        resetFilters();
+        renderTable();
         renderReports();
 
-        alert("JSON data imported successfully.");
-      } catch (err) {
-        console.error(err);
-        alert("Error reading or parsing JSON file.");
-      } finally {
-        inputImport.value = "";
+        alert("All local data has been cleared.");
+      });
+    }
+
+    // ===== DOMContentLoaded =====
+    document.addEventListener("DOMContentLoaded", () => {
+      // top date & button
+      const topDate = document.getElementById("top-date");
+      if (topDate) {
+        topDate.value = new Date().toISOString().slice(0, 10);
       }
-    });
-  }
 
-  // ===== Clear All Data =====
-  function initClearData() {
-    const btnClear = document.getElementById("btn-clear-data");
-    if (!btnClear) return;
+      const btnToday = document.getElementById("btn-today");
+      if (btnToday) {
+        btnToday.addEventListener("click", () => resetFilters());
+      }
 
-    btnClear.addEventListener("click", () => {
-      const ok = confirm(
-        "This will delete ALL handovers, users and accounts from this browser. Are you sure?"
-      );
-      if (!ok) return;
+      const filterFrom = document.getElementById("filter-from");
+      if (filterFrom) {
+        filterFrom.addEventListener("change", applyFilters);
+      }
+      const filterTo = document.getElementById("filter-to");
+      if (filterTo) {
+        filterTo.addEventListener("change", applyFilters);
+      }
+      const filterStatus = document.getElementById("filter-status");
+      if (filterStatus) {
+        filterStatus.addEventListener("change", applyFilters);
+      }
+      const filterDateFrom =
+        document.getElementById("filter-date-from");
+      if (filterDateFrom) {
+        filterDateFrom.addEventListener("change", applyFilters);
+      }
+      const filterSearch = document.getElementById("filter-search");
+      if (filterSearch) {
+        filterSearch.addEventListener("input", applyFilters);
+      }
+      const btnResetFilters =
+        document.getElementById("btn-reset-filters");
+      if (btnResetFilters) {
+        btnResetFilters.addEventListener("click", resetFilters);
+      }
 
-      localStorage.removeItem("warehouseHandovers");
-      localStorage.removeItem("warehouseUsers");
-      localStorage.removeItem("warehouseAccounts");
+      loadUsers();
+      loadHandovers();
+      loadAccounts();
 
-      handovers = [];
-      filteredHandovers = [];
-      users = [];
-      accounts = [];
-
+      initSidebarNavigation();
+      initUserForm();
+      initUserModal();
       renderUsers();
+
+      initHandoverModal();
+      initAccountModal();
+
       refreshUserSelectOptions();
-      renderAccounts();
       renderTable();
-      renderReports();
+      renderAccounts();
+      initAdminTools();
 
-      alert("All local data has been cleared.");
+      const savedView =
+        localStorage.getItem("warehouseActiveView") ||
+        "dashboard";
+      setActiveView(savedView, false);
     });
-  }
-
-  // ===== DOMContentLoaded =====
-  document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("top-date").value =
-      new Date().toISOString().slice(0, 10);
-
-    document
-      .getElementById("btn-today")
-      .addEventListener("click", () => resetFilters());
-
-    document
-      .getElementById("filter-from")
-      .addEventListener("change", applyFilters);
-    document
-      .getElementById("filter-to")
-      .addEventListener("change", applyFilters);
-    document
-      .getElementById("filter-status")
-      .addEventListener("change", applyFilters);
-    document
-      .getElementById("filter-date-from")
-      .addEventListener("change", applyFilters);
-    document
-      .getElementById("filter-search")
-      .addEventListener("input", applyFilters);
-
-    document
-      .getElementById("btn-reset-filters")
-      .addEventListener("click", resetFilters);
-
-    loadUsers();
-    loadHandovers();
-    loadAccounts();
-
-    initSidebarNavigation();
-    initUserForm();
-    initUserModal();
-    renderUsers();
-
-    initHandoverModal();
-    initAccountModal();
-
-    refreshUserSelectOptions();
-    renderTable();
-    renderAccounts();
-    initAdminTools();
-
-    const savedView = localStorage.getItem("warehouseActiveView") || "dashboard";
-    setActiveView(savedView, false);
-  });
-</script>
+  </script>
+</body>
+</html>
