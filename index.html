@@ -457,13 +457,13 @@
       </div>
     </section>
 
-    <!-- HANDOVERS VIEW -->
+    <!-- HANDOVERS VIEW: COMPLETED ONLY -->
     <section class="view-section d-none" data-view="handovers">
       <div class="top-bar mb-3">
         <div>
-          <div class="top-bar-title">Handovers - Detailed View</div>
+          <div class="top-bar-title">Completed Handovers</div>
           <div style="font-size: 0.85rem; color: #6b7280">
-            Detailed information about all handovers.
+            All handovers that are currently marked as Completed.
           </div>
         </div>
         <button class="btn btn-sm btn-primary" id="btn-add-handover-2">
@@ -472,10 +472,30 @@
       </div>
 
       <div class="table-card">
-        <h6>All Handovers</h6>
-        <p class="text-muted mb-2">
-          You can add extra tables or reports for handovers here later.
-        </p>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">Completed Handovers</h6>
+          <span id="completed-count" style="font-size: 0.8rem; color: #6b7280"></span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+            <tr>
+              <th>HNDR ID</th>
+              <th>FROM</th>
+              <th>TO</th>
+              <th>ITEMS</th>
+              <th>STATUS</th>
+              <th>DATE</th>
+              <th>ACTION BY</th>
+              <th>ATTACHMENT</th>
+              <th style="width: 90px;">ACTIONS</th>
+            </tr>
+            </thead>
+            <tbody id="completed-tbody">
+            <!-- completed rows -->
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -550,21 +570,48 @@
         </div>
       </div>
 
+      <!-- KPIs -->
+      <div class="row g-3 mb-3">
+        <div class="col-md-3">
+          <div class="stat-card">
+            <span class="stat-label">Total Handovers</span>
+            <div class="stat-value" id="rep-total">0</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="stat-card">
+            <span class="stat-label">Completed</span>
+            <div class="stat-value text-success" id="rep-completed">0</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="stat-card">
+            <span class="stat-label">Pending</span>
+            <div class="stat-value text-warning" id="rep-pending">0</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="stat-card">
+            <span class="stat-label">Delayed</span>
+            <div class="stat-value text-danger" id="rep-delayed">0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts -->
       <div class="row g-3">
         <div class="col-lg-6">
           <div class="chart-card">
-            <h6>Monthly Handovers</h6>
-            <p class="text-muted mb-0">
-              You can add more Chart.js charts here (for example, handovers per month).
-            </p>
+            <h6>Status Distribution</h6>
+            <p class="text-muted mb-2">Handovers by current status.</p>
+            <canvas id="reports-status-chart" height="220"></canvas>
           </div>
         </div>
         <div class="col-lg-6">
           <div class="chart-card">
-            <h6>Top Warehouses</h6>
-            <p class="text-muted mb-0">
-              Reports about top warehouses by activity, delays, and more.
-            </p>
+            <h6>Handovers by User</h6>
+            <p class="text-muted mb-2">Number of handovers per Action By.</p>
+            <canvas id="reports-user-chart" height="220"></canvas>
           </div>
         </div>
       </div>
@@ -620,6 +667,15 @@
               placeholder="e.g. 150 cartons of product X"
               required
             />
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Long Description</label>
+            <textarea
+              class="form-control"
+              id="handover-long-desc"
+              rows="3"
+              placeholder="Optional detailed notes about this handover (reason, transport, additional comments)"
+            ></textarea>
           </div>
           <div class="mb-2">
             <label class="form-label">Status</label>
@@ -723,8 +779,8 @@
 <script>
   // ===== Data & Storage =====
   const defaultUsers = [
-    { name: "Sameer Jabbar", role: "Manager",   email: "sameer_jabbar@yahoo.com" },
-    { name: "Ardasher A. Ahmad", role: "Supervisor", email: "" },
+    { name: "Sameer Jabbar",       role: "Manager",    email: "sameer_jabbar@yahoo.com" },
+    { name: "Ardasher A. Ahmad",   role: "Supervisor", email: "" },
   ];
 
   const defaultHandovers = [
@@ -733,6 +789,7 @@
       from: "Sameer Jabbar",
       to: "Ardasher A. Ahmad",
       items: "120 cartons of Product A",
+      longDescription: "",
       status: "Pending",
       date: "2025-11-20",
       actionBy: "Sameer Jabbar",
@@ -744,6 +801,7 @@
       from: "Ardasher A. Ahmad",
       to: "Sameer Jabbar",
       items: "80 pallets of Product B",
+      longDescription: "",
       status: "In Progress",
       date: "2025-11-21",
       actionBy: "Ardasher A. Ahmad",
@@ -756,6 +814,8 @@
   let filteredHandovers = [];
   let users = [];
   let statusChart = null;
+  let reportsStatusChart = null;
+  let reportsUserChart = null;
 
   let isEditMode = false;
   let editingId = null;
@@ -766,9 +826,10 @@
   // modal references
   let handoverModal;
   let handoverForm;
-  let inputId, inputFrom, inputTo, inputItems, inputStatus, inputDate, inputActionBy,
+  let inputId, inputFrom, inputTo, inputItems, inputLongDesc, inputStatus, inputDate, inputActionBy,
       attachmentInput, currentAttachmentInfo, modalTitleEl;
 
+  // ===== LocalStorage helpers =====
   function loadUsers() {
     const saved = localStorage.getItem("warehouseUsers");
     if (saved) {
@@ -831,6 +892,7 @@
     }
   }
 
+  // ===== Dashboard table =====
   function renderTable() {
     const tbody = document.getElementById("handover-tbody");
     tbody.innerHTML = "";
@@ -870,9 +932,54 @@
     document.getElementById("table-count").textContent =
       filteredHandovers.length + " records";
 
+    renderCompletedTable();
     attachRowActions();
     updateStats();
     renderChart();
+    renderReports(); // تحديث التقارير
+  }
+
+  // ===== Completed table in Handovers tab =====
+  function renderCompletedTable() {
+    const tbody = document.getElementById("completed-tbody");
+    const countEl = document.getElementById("completed-count");
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+    const completed = handovers.filter((h) => h.status === "Completed");
+
+    completed.forEach((h) => {
+      const linkUrl = h.attachmentDataUrl || h.attachmentUrl || null;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><span class="fw-semibold">${h.id}</span></td>
+        <td>${h.from}</td>
+        <td>${h.to}</td>
+        <td>${h.items}</td>
+        <td><span class="${getStatusClass(h.status)}">${h.status}</span></td>
+        <td>${h.date}</td>
+        <td>${h.actionBy || ""}</td>
+        <td>
+          ${
+            linkUrl
+              ? `<a href="${linkUrl}" target="_blank" class="btn btn-sm btn-outline-primary" title="${h.attachmentName || "Attachment"}">
+                   <i class="bi bi-paperclip"></i>
+                 </a>`
+              : `<span class="text-muted" style="font-size:0.8rem;">None</span>`
+          }
+        </td>
+        <td>
+          <button class="btn btn-sm btn-outline-secondary btn-view" data-id="${h.id}" title="View / Edit">
+            <i class="bi bi-eye"></i>
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    if (countEl) {
+      countEl.textContent = completed.length + " records";
+    }
   }
 
   function attachRowActions() {
@@ -994,6 +1101,85 @@
     });
   }
 
+  // ===== Reports (KPIs + charts) =====
+  function renderReports() {
+    const total = handovers.length;
+    const pending = handovers.filter(h => h.status === "Pending").length;
+    const completed = handovers.filter(h => h.status === "Completed").length;
+    const delayed = handovers.filter(h => h.status === "Delayed").length;
+
+    const repTotal = document.getElementById("rep-total");
+    if (!repTotal) return; // reports view not rendered yet
+
+    document.getElementById("rep-total").textContent = total;
+    document.getElementById("rep-pending").textContent = pending;
+    document.getElementById("rep-completed").textContent = completed;
+    document.getElementById("rep-delayed").textContent = delayed;
+
+    const ctxStatus = document.getElementById("reports-status-chart");
+    const ctxUser = document.getElementById("reports-user-chart");
+    if (!ctxStatus || !ctxUser) return;
+
+    const inProgress = handovers.filter(h => h.status === "In Progress").length;
+
+    if (reportsStatusChart) reportsStatusChart.destroy();
+    reportsStatusChart = new Chart(ctxStatus.getContext("2d"), {
+      type: "pie",
+      data: {
+        labels: ["Pending", "In Progress", "Completed", "Delayed"],
+        datasets: [
+          {
+            data: [pending, inProgress, completed, delayed],
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: "bottom" },
+        },
+      },
+    });
+
+    const byUser = {};
+    handovers.forEach(h => {
+      const key = h.actionBy || "Unknown";
+      byUser[key] = (byUser[key] || 0) + 1;
+    });
+
+    const userLabels = Object.keys(byUser);
+    const userData = Object.values(byUser);
+
+    if (reportsUserChart) reportsUserChart.destroy();
+    reportsUserChart = new Chart(ctxUser.getContext("2d"), {
+      type: "bar",
+      data: {
+        labels: userLabels,
+        datasets: [
+          {
+            label: "Handovers",
+            data: userData,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+        },
+        scales: {
+          x: {
+            ticks: { font: { size: 11 } },
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { stepSize: 1 },
+          },
+        },
+      },
+    });
+  }
+
   function readFileAsDataUrl(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -1040,6 +1226,7 @@
     }
   }
 
+  // ===== Handover Modal =====
   function initHandoverModal() {
     const modalEl = document.getElementById("handover-modal");
     handoverModal = new bootstrap.Modal(modalEl);
@@ -1050,6 +1237,7 @@
     inputFrom = document.getElementById("handover-from");
     inputTo = document.getElementById("handover-to");
     inputItems = document.getElementById("handover-items");
+    inputLongDesc = document.getElementById("handover-long-desc");
     inputStatus = document.getElementById("handover-status");
     inputDate = document.getElementById("handover-date");
     inputActionBy = document.getElementById("handover-action-by");
@@ -1072,6 +1260,7 @@
         inputDate.value = new Date().toISOString().slice(0, 10);
         currentAttachmentInfo.textContent = "No attachment";
         attachmentInput.value = "";
+        inputLongDesc.value = "";
 
         if (users.length > 0) {
           inputFrom.value = users[0].name;
@@ -1090,6 +1279,7 @@
       const from = inputFrom.value;
       const to = inputTo.value;
       const items = inputItems.value;
+      const longDescription = inputLongDesc.value;
       const status = inputStatus.value;
       const date = inputDate.value;
       const actionBy = inputActionBy.value;
@@ -1119,6 +1309,7 @@
           from,
           to,
           items,
+          longDescription,
           status,
           date,
           actionBy,
@@ -1132,6 +1323,7 @@
           from,
           to,
           items,
+          longDescription,
           status,
           date,
           actionBy,
@@ -1162,6 +1354,7 @@
     inputFrom.value = h.from;
     inputTo.value = h.to;
     inputItems.value = h.items;
+    inputLongDesc.value = h.longDescription || "";
     inputStatus.value = h.status;
     inputDate.value = h.date;
     inputActionBy.value = h.actionBy || (users[0] ? users[0].name : "");
@@ -1177,30 +1370,47 @@
     handoverModal.show();
   }
 
-  function initSidebarNavigation() {
+  // ===== Sidebar navigation with remember last view =====
+  function setActiveView(view, save = true) {
     const navLinks = document.querySelectorAll(".sidebar-nav .nav-link");
     const views = document.querySelectorAll(".view-section");
 
+    navLinks.forEach((link) => {
+      const v = link.getAttribute("data-view");
+      if (v === view) {
+        link.classList.add("active");
+      } else {
+        link.classList.remove("active");
+      }
+    });
+
+    views.forEach((section) => {
+      const v = section.getAttribute("data-view");
+      if (v === view) {
+        section.classList.remove("d-none");
+      } else {
+        section.classList.add("d-none");
+      }
+    });
+
+    if (save) {
+      localStorage.setItem("warehouseActiveView", view);
+    }
+  }
+
+  function initSidebarNavigation() {
+    const navLinks = document.querySelectorAll(".sidebar-nav .nav-link");
     navLinks.forEach((link) => {
       link.addEventListener("click", (e) => {
         e.preventDefault();
         const view = link.getAttribute("data-view");
         if (!view) return;
-
-        navLinks.forEach((l) => l.classList.remove("active"));
-        link.classList.add("active");
-
-        views.forEach((section) => {
-          if (section.getAttribute("data-view") === view) {
-            section.classList.remove("d-none");
-          } else {
-            section.classList.add("d-none");
-          }
-        });
+        setActiveView(view, true);
       });
     });
   }
 
+  // ===== Users (list & edit) =====
   function renderUsers() {
     const tbody = document.getElementById("users-tbody");
     tbody.innerHTML = "";
@@ -1287,6 +1497,7 @@
     userModal.show();
   }
 
+  // ===== Export JSON =====
   function initExportJson() {
     const btn = document.getElementById("btn-export-json");
     if (!btn) return;
@@ -1311,6 +1522,7 @@
     });
   }
 
+  // ===== DOMContentLoaded =====
   document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("top-date").value =
       new Date().toISOString().slice(0, 10);
@@ -1345,10 +1557,14 @@
     initUserForm();
     initUserModal();
     renderUsers();
-    refreshUserSelectOptions();
     initHandoverModal();
+    refreshUserSelectOptions();
     renderTable();
     initExportJson();
+
+    // استرجاع آخر تبويب تم فتحه
+    const savedView = localStorage.getItem("warehouseActiveView") || "dashboard";
+    setActiveView(savedView, false);
   });
 </script>
 </body>
