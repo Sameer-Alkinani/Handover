@@ -434,6 +434,7 @@
                   <th>FROM</th>
                   <th>TO</th>
                   <th>ITEMS</th>
+                  <th>PRIORITY</th>
                   <th>STATUS</th>
                   <th>DATE</th>
                   <th>ACTION BY</th>
@@ -488,6 +489,7 @@
               <th>FROM</th>
               <th>TO</th>
               <th>ITEMS</th>
+              <th>PRIORITY</th>
               <th>STATUS</th>
               <th>DATE</th>
               <th>ACTION BY</th>
@@ -721,6 +723,15 @@
             ></textarea>
           </div>
           <div class="mb-2">
+            <label class="form-label">Priority Level</label>
+            <select class="form-select" id="handover-priority" required>
+              <option value="P1">P1 - High</option>
+              <option value="P2">P2 - Moderate</option>
+              <option value="P3">P3 - Low</option>
+              <option value="P4">P4 - Negligible</option>
+            </select>
+          </div>
+          <div class="mb-2">
             <label class="form-label">Status</label>
             <select class="form-select" id="handover-status" required>
               <option>Pending</option>
@@ -903,6 +914,7 @@
       to: "Ardasher A. Ahmad",
       items: "120 cartons of Product A",
       longDescription: "",
+      priority: "P1",
       status: "Pending",
       date: "2025-11-20",
       actionBy: "Sameer Jabbar",
@@ -917,6 +929,7 @@
       to: "Sameer Jabbar",
       items: "80 pallets of Product B",
       longDescription: "",
+      priority: "P2",
       status: "In Progress",
       date: "2025-11-21",
       actionBy: "Ardasher A. Ahmad",
@@ -953,7 +966,8 @@
 
   let handoverModal;
   let handoverForm;
-  let inputId, inputFrom, inputTo, inputItems, inputLongDesc, inputStatus, inputDate, inputActionBy,
+  let inputId, inputFrom, inputTo, inputItems, inputLongDesc, inputPriority,
+      inputStatus, inputDate, inputActionBy,
       attachmentInput, currentAttachmentInfo, modalTitleEl;
 
   // admin accounts modal
@@ -1055,6 +1069,7 @@
         <td>${h.from}</td>
         <td>${h.to}</td>
         <td>${h.items}</td>
+        <td>${h.priority || "-"}</td>
         <td><span class="${getStatusClass(h.status)}">${h.status}</span></td>
         <td>${h.date}</td>
         <td>${h.actionBy || ""}</td>
@@ -1109,6 +1124,7 @@
         <td>${h.from}</td>
         <td>${h.to}</td>
         <td>${h.items}</td>
+        <td>${h.priority || "-"}</td>
         <td><span class="${getStatusClass(h.status)}">${h.status}</span></td>
         <td>${h.date}</td>
         <td>${h.actionBy || ""}</td>
@@ -1395,6 +1411,7 @@
     inputTo = document.getElementById("handover-to");
     inputItems = document.getElementById("handover-items");
     inputLongDesc = document.getElementById("handover-long-desc");
+    inputPriority = document.getElementById("handover-priority");
     inputStatus = document.getElementById("handover-status");
     inputDate = document.getElementById("handover-date");
     inputActionBy = document.getElementById("handover-action-by");
@@ -1418,6 +1435,7 @@
         currentAttachmentInfo.textContent = "No attachment";
         attachmentInput.value = "";
         inputLongDesc.value = "";
+        inputPriority.value = "P3";
 
         if (users.length > 0) {
           inputFrom.value = users[0].name;
@@ -1437,6 +1455,7 @@
       const to = inputTo.value;
       const items = inputItems.value;
       const longDescription = inputLongDesc.value;
+      const priority = inputPriority.value;
       const status = inputStatus.value;
       const date = inputDate.value;
       const actionBy = inputActionBy.value;
@@ -1477,6 +1496,7 @@
           to,
           items,
           longDescription,
+          priority,
           status,
           date,
           actionBy,
@@ -1493,6 +1513,7 @@
           to,
           items,
           longDescription,
+          priority,
           status,
           date,
           actionBy,
@@ -1526,6 +1547,7 @@
     inputTo.value = h.to;
     inputItems.value = h.items;
     inputLongDesc.value = h.longDescription || "";
+    inputPriority.value = h.priority || "P3";
     inputStatus.value = h.status;
     inputDate.value = h.date;
     inputActionBy.value = h.actionBy || (users[0] ? users[0].name : "");
