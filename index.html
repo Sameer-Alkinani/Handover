@@ -277,6 +277,10 @@
           <i class="bi bi-buildings"></i>
           <span>Warehouses</span>
         </a>
+        <a href="#" class="nav-link" data-view="admin-users">
+          <i class="bi bi-people"></i>
+          <span>Users (Admin)</span>
+        </a>
         <a href="#" class="nav-link" data-view="reports">
           <i class="bi bi-bar-chart-line"></i>
           <span>Reports</span>
@@ -554,6 +558,45 @@
       </div>
     </section>
 
+    <!-- ADMIN USERS VIEW -->
+    <section class="view-section d-none" data-view="admin-users">
+      <div class="top-bar mb-3">
+        <div>
+          <div class="top-bar-title">Users (Admin)</div>
+          <div style="font-size: 0.85rem; color: #6b7280">
+            Manage application accounts (username, role, and link to employees).  
+            No real passwords here yet – prototype only.
+          </div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">User Accounts</h6>
+          <button class="btn btn-sm btn-primary" id="btn-add-account">
+            <i class="bi bi-plus-lg"></i> Add Account
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+            <tr>
+              <th>#</th>
+              <th>Username</th>
+              <th>Employee</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th style="width: 70px;">Actions</th>
+            </tr>
+            </thead>
+            <tbody id="accounts-tbody">
+            <!-- account rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <!-- REPORTS VIEW -->
     <section class="view-section d-none" data-view="reports">
       <div class="top-bar mb-3">
@@ -700,7 +743,6 @@
             <div id="current-attachment-info" class="small text-muted mb-1">
               No attachment
             </div>
-            <!-- لا نستخدم accept حتى نسمح بكل الأنواع -->
             <input type="file" class="form-control" id="handover-attachment" />
             <div class="form-text">
               You can attach any file (image, PDF, Word, Excel, email export, etc.).  
@@ -775,12 +817,78 @@
   </div>
 </div>
 
+<!-- Modal: Admin User Account -->
+<div
+  class="modal fade"
+  id="account-modal"
+  tabindex="-1"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="account-form">
+        <div class="modal-header">
+          <h5 class="modal-title">User Account</h5>
+          <button
+            type="button"
+            class="btn-close"
+            data-bs-dismiss="modal"
+            aria-label="Close"
+          ></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-2">
+            <label class="form-label">Username</label>
+            <input type="text" id="account-username" class="form-control" required />
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Linked Employee (optional)</label>
+            <select id="account-employee" class="form-select">
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Role</label>
+            <select id="account-role" class="form-select">
+              <option>Admin</option>
+              <option>Supervisor</option>
+              <option>User</option>
+              <option>Viewer</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Status</label>
+            <select id="account-status" class="form-select">
+              <option value="Active">Active</option>
+              <option value="Disabled">Disabled</option>
+            </select>
+          </div>
+          <div class="alert alert-warning mt-2 mb-0" style="font-size:0.8rem;">
+            Passwords are not stored in this prototype.  
+            This page is only to design and plan user accounts.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-light"
+            data-bs-dismiss="modal"
+          >
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-primary">
+            Save account
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-  // ===== Attachment size limit (about 3 MB) =====
-  const MAX_ATTACHMENT_SIZE = 3 * 1024 * 1024;
+  const MAX_ATTACHMENT_SIZE = 3 * 1024 * 1024; // ~3MB
 
   // ===== Data & Storage =====
   const defaultUsers = [
@@ -819,9 +927,20 @@
     },
   ];
 
+  const defaultAccounts = [
+    {
+      username: "admin",
+      employeeName: "Sameer Jabbar",
+      role: "Admin",
+      status: "Active",
+    },
+  ];
+
   let handovers = [];
   let filteredHandovers = [];
   let users = [];
+  let accounts = [];
+
   let statusChart = null;
   let reportsStatusChart = null;
   let reportsUserChart = null;
@@ -832,11 +951,16 @@
   let editingUserIndex = null;
   let userModal, userEditForm, editUserNameInput, editUserRoleInput, editUserEmailInput;
 
-  // modal references
   let handoverModal;
   let handoverForm;
   let inputId, inputFrom, inputTo, inputItems, inputLongDesc, inputStatus, inputDate, inputActionBy,
       attachmentInput, currentAttachmentInfo, modalTitleEl;
+
+  // admin accounts modal
+  let accountModal, accountForm;
+  let accountUsernameInput, accountEmployeeSelect, accountRoleSelect, accountStatusSelect;
+  let isEditAccount = false;
+  let editingAccountIndex = null;
 
   // ===== LocalStorage helpers =====
   function loadUsers() {
@@ -872,6 +996,23 @@
 
   function saveHandovers() {
     localStorage.setItem("warehouseHandovers", JSON.stringify(handovers));
+  }
+
+  function loadAccounts() {
+    const saved = localStorage.getItem("warehouseAccounts");
+    if (saved) {
+      try {
+        accounts = JSON.parse(saved);
+      } catch {
+        accounts = [...defaultAccounts];
+      }
+    } else {
+      accounts = [...defaultAccounts];
+    }
+  }
+
+  function saveAccounts() {
+    localStorage.setItem("warehouseAccounts", JSON.stringify(accounts));
   }
 
   function generateNextId() {
@@ -949,10 +1090,9 @@
     attachRowActions();
     updateStats();
     renderChart();
-    renderReports(); // تحديث التقارير
+    renderReports();
   }
 
-  // ===== Completed table in Handovers tab =====
   function renderCompletedTable() {
     const tbody = document.getElementById("completed-tbody");
     const countEl = document.getElementById("completed-count");
@@ -1034,7 +1174,6 @@
       if (from && h.from !== from) ok = false;
       if (to && h.to !== to) ok = false;
       if (status && h.status !== status) ok = false;
-
       if (dateFrom && h.date < dateFrom) ok = false;
 
       if (search) {
@@ -1118,7 +1257,7 @@
     });
   }
 
-  // ===== Reports (KPIs + charts) =====
+  // ===== Reports =====
   function renderReports() {
     const total = handovers.length;
     const pending = handovers.filter(h => h.status === "Pending").length;
@@ -1126,7 +1265,7 @@
     const delayed = handovers.filter(h => h.status === "Delayed").length;
 
     const repTotal = document.getElementById("rep-total");
-    if (!repTotal) return; // reports view not rendered yet
+    if (!repTotal) return;
 
     document.getElementById("rep-total").textContent = total;
     document.getElementById("rep-pending").textContent = pending;
@@ -1229,18 +1368,19 @@
   function refreshUserSelectOptions() {
     const names = users.map((u) => u.name);
 
-    // Filters
     const filterFrom = document.getElementById("filter-from");
     const filterTo = document.getElementById("filter-to");
     setSelectOptions(filterFrom, names, true, "All");
     setSelectOptions(filterTo, names, true, "All");
 
-    // Modal selects
     if (inputFrom && inputTo && inputActionBy) {
       setSelectOptions(inputFrom, names, false);
       setSelectOptions(inputTo, names, false);
       setSelectOptions(inputActionBy, names, false);
     }
+
+    // update employee list in account modal
+    fillAccountEmployeeOptions();
   }
 
   // ===== Handover Modal =====
@@ -1404,7 +1544,7 @@
     handoverModal.show();
   }
 
-  // ===== Sidebar navigation with remember last view =====
+  // ===== Sidebar navigation =====
   function setActiveView(view, save = true) {
     const navLinks = document.querySelectorAll(".sidebar-nav .nav-link");
     const views = document.querySelectorAll(".view-section");
@@ -1444,7 +1584,7 @@
     });
   }
 
-  // ===== Users (list & edit) =====
+  // ===== Users (employees) =====
   function renderUsers() {
     const tbody = document.getElementById("users-tbody");
     tbody.innerHTML = "";
@@ -1531,6 +1671,120 @@
     userModal.show();
   }
 
+  // ===== Admin Accounts =====
+  function renderAccounts() {
+    const tbody = document.getElementById("accounts-tbody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+
+    accounts.forEach((acc, index) => {
+      const tr = document.createElement("tr");
+      const badgeClass =
+        acc.status === "Disabled"
+          ? "bg-secondary-subtle text-secondary"
+          : "bg-success-subtle text-success";
+      tr.innerHTML = `
+        <td>${index + 1}</td>
+        <td>${acc.username}</td>
+        <td>${acc.employeeName || "-"}</td>
+        <td>${acc.role || ""}</td>
+        <td>
+          <span class="badge rounded-pill ${badgeClass}">
+            ${acc.status || "Active"}
+          </span>
+        </td>
+        <td>
+          <button class="btn btn-sm btn-outline-secondary btn-edit-account" data-index="${index}">
+            <i class="bi bi-pencil"></i>
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    attachAccountRowActions();
+  }
+
+  function attachAccountRowActions() {
+    document.querySelectorAll(".btn-edit-account").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const idx = parseInt(btn.getAttribute("data-index"), 10);
+        openEditAccount(idx);
+      });
+    });
+  }
+
+  function fillAccountEmployeeOptions() {
+    if (!accountEmployeeSelect) return;
+    accountEmployeeSelect.innerHTML = "";
+    const optNone = document.createElement("option");
+    optNone.value = "";
+    optNone.textContent = "(No linked employee)";
+    accountEmployeeSelect.appendChild(optNone);
+
+    users.forEach((u) => {
+      const opt = document.createElement("option");
+      opt.value = u.name;
+      opt.textContent = u.name;
+      accountEmployeeSelect.appendChild(opt);
+    });
+  }
+
+  function initAccountModal() {
+    const modalEl = document.getElementById("account-modal");
+    accountModal = new bootstrap.Modal(modalEl);
+    accountForm = document.getElementById("account-form");
+    accountUsernameInput = document.getElementById("account-username");
+    accountEmployeeSelect = document.getElementById("account-employee");
+    accountRoleSelect = document.getElementById("account-role");
+    accountStatusSelect = document.getElementById("account-status");
+
+    fillAccountEmployeeOptions();
+
+    const btnAdd = document.getElementById("btn-add-account");
+    if (btnAdd) {
+      btnAdd.addEventListener("click", () => {
+        isEditAccount = false;
+        editingAccountIndex = null;
+        accountForm.reset();
+        fillAccountEmployeeOptions();
+        accountStatusSelect.value = "Active";
+        accountModal.show();
+      });
+    }
+
+    accountForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const username = accountUsernameInput.value.trim();
+      const employeeName = accountEmployeeSelect.value || "";
+      const role = accountRoleSelect.value || "User";
+      const status = accountStatusSelect.value || "Active";
+      if (!username) return;
+
+      if (isEditAccount && editingAccountIndex !== null) {
+        accounts[editingAccountIndex] = { username, employeeName, role, status };
+      } else {
+        accounts.push({ username, employeeName, role, status });
+      }
+      saveAccounts();
+      renderAccounts();
+      accountModal.hide();
+    });
+  }
+
+  function openEditAccount(index) {
+    const acc = accounts[index];
+    if (!acc) return;
+    isEditAccount = true;
+    editingAccountIndex = index;
+    fillAccountEmployeeOptions();
+    accountUsernameInput.value = acc.username;
+    accountEmployeeSelect.value = acc.employeeName || "";
+    accountRoleSelect.value = acc.role || "User";
+    accountStatusSelect.value = acc.status || "Active";
+    accountModal.show();
+  }
+
   // ===== Export JSON =====
   function initExportJson() {
     const btn = document.getElementById("btn-export-json");
@@ -1540,6 +1794,7 @@
         exportedAt: new Date().toISOString(),
         handovers,
         users,
+        accounts,
       };
       const blob = new Blob([JSON.stringify(data, null, 2)], {
         type: "application/json",
@@ -1587,16 +1842,21 @@
 
     loadUsers();
     loadHandovers();
+    loadAccounts();
+
     initSidebarNavigation();
     initUserForm();
     initUserModal();
     renderUsers();
+
     initHandoverModal();
+    initAccountModal();
+
     refreshUserSelectOptions();
     renderTable();
+    renderAccounts();
     initExportJson();
 
-    // استرجاع آخر تبويب تم فتحه
     const savedView = localStorage.getItem("warehouseActiveView") || "dashboard";
     setActiveView(savedView, false);
   });
