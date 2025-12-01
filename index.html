@@ -151,16 +151,40 @@
       padding: 1rem 1.1rem;
     }
 
+    /* unified filters grid (From / To / Status / Priority / Date / Search) */
     .filters-grid {
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(6, minmax(0, 1fr));
       gap: 0.75rem;
+    }
+
+    .filters-grid .filter-search-cell {
+      grid-column: span 2;
+    }
+
+    .table-card,
+    .chart-card {
+      /* make both cards vertically resizable */
+      display: flex;
+      flex-direction: column;
+      resize: vertical;
+      overflow: auto;
+      min-height: 220px;
     }
 
     .table-responsive {
       margin-top: 0.75rem;
-      max-height: 420px;
+      /* let table grow with the card height instead of fixed max-height */
+      flex: 1 1 auto;
+      min-height: 0;
+      height: 100%;
       overflow: auto;
+      max-height: none;
+    }
+
+    .chart-card canvas {
+      flex: 1 1 auto;
+      min-height: 0;
     }
 
     table thead th {
@@ -207,14 +231,6 @@
       color: #1d4ed8;
     }
 
-    /* Allow manual resize of the Handover List card (only height) */
-    .table-card--resizable {
-      resize: vertical;
-      overflow: auto;
-      min-height: 220px;
-      max-height: 80vh;
-    }
-
     @media (max-width: 992px) {
       .app-shell {
         flex-direction: column;
@@ -243,7 +259,7 @@
       }
 
       .filters-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
       }
     }
 
@@ -254,6 +270,10 @@
 
       .filters-grid {
         grid-template-columns: 1fr;
+      }
+
+      .filters-grid .filter-search-cell {
+        grid-column: span 1;
       }
     }
   </style>
@@ -403,6 +423,16 @@
             </select>
           </div>
           <div>
+            <label class="form-label form-label-sm">Priority</label>
+            <select id="filter-priority" class="form-select form-select-sm">
+              <option value="">All</option>
+              <option value="P1">P1 - High</option>
+              <option value="P2">P2 - Moderate</option>
+              <option value="P3">P3 - Low</option>
+              <option value="P4">P4 - Negligible</option>
+            </select>
+          </div>
+          <div>
             <label class="form-label form-label-sm">Date From</label>
             <input
               type="date"
@@ -410,7 +440,7 @@
               class="form-control form-control-sm"
             />
           </div>
-          <div>
+          <div class="filter-search-cell">
             <label class="form-label form-label-sm">Search</label>
             <input
               type="text"
@@ -426,7 +456,7 @@
       <div class="row mt-2 g-3">
         <!-- Table -->
         <div class="col-lg-8">
-          <section class="table-card table-card--resizable">
+          <section class="table-card">
             <div class="d-flex justify-content-between align-items-center mb-2">
               <h6 class="mb-0">Handover List</h6>
               <span
@@ -464,7 +494,7 @@
             <div class="d-flex justify-content-between align-items-center mb-2">
               <h6 class="mb-0">By Status</h6>
             </div>
-            <canvas id="status-chart" height="220"></canvas>
+            <canvas id="status-chart"></canvas>
           </section>
         </div>
       </div>
@@ -617,20 +647,9 @@
           </div>
         </div>
         <div class="d-flex align-items-center gap-2">
-          <button class="btn btn-sm btn-outline-secondary" id="btn-import-json">
-            <i class="bi bi-upload"></i> Import JSON (Admin)
-          </button>
-
           <button class="btn btn-sm btn-outline-secondary" id="btn-export-json">
             <i class="bi bi-download"></i> Export JSON (Admin)
           </button>
-
-          <input
-            type="file"
-            id="import-json-input"
-            accept="application/json"
-            hidden
-          />
         </div>
       </div>
 
@@ -668,14 +687,14 @@
           <div class="chart-card">
             <h6>Status Distribution</h6>
             <p class="text-muted mb-2">Handovers by current status.</p>
-            <canvas id="reports-status-chart" height="220"></canvas>
+            <canvas id="reports-status-chart"></canvas>
           </div>
         </div>
         <div class="col-lg-6">
           <div class="chart-card">
             <h6>Handovers by User</h6>
             <p class="text-muted mb-2">Number of handovers per Action By.</p>
-            <canvas id="reports-user-chart" height="220"></canvas>
+            <canvas id="reports-user-chart"></canvas>
           </div>
         </div>
       </div>
@@ -1198,6 +1217,7 @@
     const from = document.getElementById("filter-from").value;
     const to = document.getElementById("filter-to").value;
     const status = document.getElementById("filter-status").value;
+    const priority = document.getElementById("filter-priority").value;
     const dateFrom = document.getElementById("filter-date-from").value;
     const search = document
       .getElementById("filter-search")
@@ -1209,6 +1229,7 @@
       if (from && h.from !== from) ok = false;
       if (to && h.to !== to) ok = false;
       if (status && h.status !== status) ok = false;
+      if (priority && h.priority !== priority) ok = false;
       if (dateFrom && h.date < dateFrom) ok = false;
 
       if (search) {
@@ -1227,6 +1248,7 @@
     document.getElementById("filter-from").value = "";
     document.getElementById("filter-to").value = "";
     document.getElementById("filter-status").value = "";
+    document.getElementById("filter-priority").value = "";
     document.getElementById("filter-date-from").value = "";
     document.getElementById("filter-search").value = "";
     filteredHandovers = [...handovers];
@@ -1246,7 +1268,9 @@
   }
 
   function renderChart() {
-    const ctx = document.getElementById("status-chart").getContext("2d");
+    const canvas = document.getElementById("status-chart");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
 
     const pending = filteredHandovers.filter((h) => h.status === "Pending").length;
     const inProgress = filteredHandovers.filter(
@@ -1272,6 +1296,7 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false, // allows chart to grow with resizable card
         plugins: {
           legend: { display: false },
         },
@@ -1326,6 +1351,7 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
           legend: { position: "bottom" },
         },
@@ -1355,6 +1381,7 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
         },
@@ -1852,71 +1879,6 @@
     });
   }
 
-  // ===== Import JSON =====
-  function initImportJson() {
-    const btn = document.getElementById("btn-import-json");
-    const input = document.getElementById("import-json-input");
-    if (!btn || !input) return;
-
-    btn.addEventListener("click", () => {
-      input.click();
-    });
-
-    input.addEventListener("change", async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      try {
-        const text = await file.text();
-        const data = JSON.parse(text);
-
-        if (
-          !data ||
-          !Array.isArray(data.handovers) ||
-          !Array.isArray(data.users) ||
-          !Array.isArray(data.accounts)
-        ) {
-          alert(
-            "Invalid JSON structure.\nThe file must contain: handovers, users, and accounts arrays."
-          );
-          input.value = "";
-          return;
-        }
-
-        const ok = confirm(
-          "This will replace all current data (handovers, users, accounts) in this browser with the data from the file.\nDo you want to continue?"
-        );
-        if (!ok) {
-          input.value = "";
-          return;
-        }
-
-        handovers = data.handovers;
-        users = data.users;
-        accounts = data.accounts;
-
-        saveHandovers();
-        saveUsers();
-        saveAccounts();
-
-        filteredHandovers = [...handovers];
-
-        renderUsers();
-        refreshUserSelectOptions();
-        renderTable();
-        renderAccounts();
-        renderReports();
-
-        alert("Data imported successfully.");
-      } catch (err) {
-        console.error(err);
-        alert("An error occurred while reading or parsing the JSON file.");
-      } finally {
-        input.value = "";
-      }
-    });
-  }
-
   // ===== DOMContentLoaded =====
   document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("top-date").value =
@@ -1934,6 +1896,9 @@
       .addEventListener("change", applyFilters);
     document
       .getElementById("filter-status")
+      .addEventListener("change", applyFilters);
+    document
+      .getElementById("filter-priority")
       .addEventListener("change", applyFilters);
     document
       .getElementById("filter-date-from")
@@ -1962,7 +1927,6 @@
     renderTable();
     renderAccounts();
     initExportJson();
-    initImportJson();
 
     const savedView = localStorage.getItem("warehouseActiveView") || "dashboard";
     setActiveView(savedView, false);
