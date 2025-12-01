@@ -149,8 +149,6 @@
       border: 1px solid #e1e4eb;
       background: #fff;
       padding: 1rem 1.1rem;
-      display: flex;
-      flex-direction: column;
     }
 
     .filters-grid {
@@ -161,8 +159,8 @@
 
     .table-responsive {
       margin-top: 0.75rem;
+      max-height: 420px;
       overflow: auto;
-      flex: 1 1 auto;
     }
 
     table thead th {
@@ -209,26 +207,12 @@
       color: #1d4ed8;
     }
 
-    /* Resizable Handover List card */
+    /* Allow manual resize of the Handover List card (only height) */
     .table-card--resizable {
       resize: vertical;
       overflow: auto;
       min-height: 220px;
       max-height: 80vh;
-    }
-
-    /* Resizable By Status chart card */
-    .chart-card--resizable {
-      resize: vertical;
-      overflow: auto;
-      min-height: 220px;
-      max-height: 80vh;
-    }
-
-    .chart-card--resizable canvas {
-      flex: 1 1 auto;
-      width: 100% !important;
-      height: 100% !important;
     }
 
     @media (max-width: 992px) {
@@ -476,7 +460,7 @@
 
         <!-- Chart -->
         <div class="col-lg-4">
-          <section class="chart-card chart-card--resizable">
+          <section class="chart-card">
             <div class="d-flex justify-content-between align-items-center mb-2">
               <h6 class="mb-0">By Status</h6>
             </div>
@@ -1288,7 +1272,6 @@
       },
       options: {
         responsive: true,
-        maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
         },
@@ -1343,7 +1326,6 @@
       },
       options: {
         responsive: true,
-        maintainAspectRatio: false,
         plugins: {
           legend: { position: "bottom" },
         },
@@ -1373,7 +1355,6 @@
       },
       options: {
         responsive: true,
-        maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
         },
