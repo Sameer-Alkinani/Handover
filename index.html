@@ -151,51 +151,16 @@
       padding: 1rem 1.1rem;
     }
 
-    /* Filters row in one line */
     .filters-grid {
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 0.75rem;
-      align-items: flex-end;
-    }
-
-    .filters-grid .filter-search-cell {
-      grid-column: span 1;
-    }
-
-    /* Resizable cards (only where we add the class) */
-    .resizable-card {
-      resize: vertical;
-      overflow: auto;
-      min-height: 260px;
-      max-height: none;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .resizable-card .table-responsive {
-      flex: 1 1 auto;
-      min-height: 0;
-      max-height: none;
     }
 
     .table-responsive {
       margin-top: 0.75rem;
       max-height: 420px;
       overflow: auto;
-    }
-
-    /* Reports chart cards – fixed height so they don't auto-expand */
-    .chart-card {
-      display: flex;
-      flex-direction: column;
-      max-height: 340px;
-      overflow: hidden;
-    }
-
-    .chart-card canvas {
-      flex: 1 1 auto;
-      min-height: 0;
     }
 
     table thead th {
@@ -242,6 +207,14 @@
       color: #1d4ed8;
     }
 
+    /* Allow manual resize of the Handover List card (only height) */
+    .table-card--resizable {
+      resize: vertical;
+      overflow: auto;
+      min-height: 220px;
+      max-height: 80vh;
+    }
+
     @media (max-width: 992px) {
       .app-shell {
         flex-direction: column;
@@ -270,7 +243,7 @@
       }
 
       .filters-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
@@ -281,10 +254,6 @@
 
       .filters-grid {
         grid-template-columns: 1fr;
-      }
-
-      .filters-grid .filter-search-cell {
-        grid-column: span 1;
       }
     }
   </style>
@@ -358,6 +327,50 @@
         </div>
       </div>
 
+      <!-- Stat cards -->
+      <section class="cards-grid">
+        <div class="stat-card">
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="stat-label">Total Handovers</span>
+            <i class="bi bi-arrows-move"></i>
+          </div>
+          <div class="stat-value" id="stat-total">0</div>
+          <div class="stat-trend text-success" id="stat-total-note">
+            Updated automatically
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="stat-label">Pending</span>
+            <i class="bi bi-hourglass-split"></i>
+          </div>
+          <div class="stat-value" id="stat-pending">0</div>
+          <div class="stat-trend text-warning" id="stat-pending-note">
+            Items awaiting confirmation
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="stat-label">Completed</span>
+            <i class="bi bi-check2-circle"></i>
+          </div>
+          <div class="stat-value text-success" id="stat-completed">0</div>
+          <div class="stat-trend text-success-emphasis" id="stat-completed-note">
+            Successfully handed over
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="stat-label">Delayed</span>
+            <i class="bi bi-exclamation-triangle"></i>
+          </div>
+          <div class="stat-value text-danger" id="stat-delayed">0</div>
+          <div class="stat-trend text-danger-emphasis" id="stat-delayed-note">
+            Check issues and follow-up
+          </div>
+        </div>
+      </section>
+
       <!-- Filters -->
       <section class="filters-card mt-2">
         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -390,16 +403,6 @@
             </select>
           </div>
           <div>
-            <label class="form-label form-label-sm">Priority</label>
-            <select id="filter-priority" class="form-select form-select-sm">
-              <option value="">All</option>
-              <option value="P1">P1</option>
-              <option value="P2">P2</option>
-              <option value="P3">P3</option>
-              <option value="P4">P4</option>
-            </select>
-          </div>
-          <div>
             <label class="form-label form-label-sm">Date From</label>
             <input
               type="date"
@@ -407,7 +410,7 @@
               class="form-control form-control-sm"
             />
           </div>
-          <div class="filter-search-cell">
+          <div>
             <label class="form-label form-label-sm">Search</label>
             <input
               type="text"
@@ -419,37 +422,52 @@
         </div>
       </section>
 
-      <!-- Handover Table (full width, resizable) -->
-      <section class="table-card resizable-card mt-2">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <h6 class="mb-0">Handover List</h6>
-          <span
-            id="table-count"
-            style="font-size: 0.8rem; color: #6b7280"
-          ></span>
+      <!-- Table + Chart -->
+      <div class="row mt-2 g-3">
+        <!-- Table -->
+        <div class="col-lg-8">
+          <section class="table-card table-card--resizable">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0">Handover List</h6>
+              <span
+                id="table-count"
+                style="font-size: 0.8rem; color: #6b7280"
+              ></span>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead>
+                <tr>
+                  <th>HNDR ID</th>
+                  <th>FROM</th>
+                  <th>TO</th>
+                  <th>ITEMS</th>
+                  <th>PRIORITY</th>
+                  <th>STATUS</th>
+                  <th>DATE</th>
+                  <th>ACTION BY</th>
+                  <th>ATTACHMENT</th>
+                  <th style="width: 90px;">ACTIONS</th>
+                </tr>
+                </thead>
+                <tbody id="handover-tbody">
+                <!-- Rows rendered by JS -->
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
-        <div class="table-responsive">
-          <table class="table table-sm align-middle">
-            <thead>
-            <tr>
-              <th>HNDR ID</th>
-              <th>FROM</th>
-              <th>TO</th>
-              <th>ITEMS</th>
-              <th>PRIORITY</th>
-              <th>STATUS</th>
-              <th>DATE</th>
-              <th>ACTION BY</th>
-              <th>ATTACHMENT</th>
-              <th style="width: 90px;">ACTIONS</th>
-            </tr>
-            </thead>
-            <tbody id="handover-tbody">
-            <!-- Rows rendered by JS -->
-            </tbody>
-          </table>
+
+        <!-- Chart -->
+        <div class="col-lg-4">
+          <section class="chart-card">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0">By Status</h6>
+            </div>
+            <canvas id="status-chart" height="220"></canvas>
+          </section>
         </div>
-      </section>
+      </div>
     </section>
 
     <!-- HANDOVERS VIEW: COMPLETED ONLY -->
@@ -602,10 +620,17 @@
           <button class="btn btn-sm btn-outline-secondary" id="btn-import-json">
             <i class="bi bi-upload"></i> Import JSON (Admin)
           </button>
+
           <button class="btn btn-sm btn-outline-secondary" id="btn-export-json">
             <i class="bi bi-download"></i> Export JSON (Admin)
           </button>
-          <input type="file" id="import-json-input" accept="application/json" hidden />
+
+          <input
+            type="file"
+            id="import-json-input"
+            accept="application/json"
+            hidden
+          />
         </div>
       </div>
 
@@ -1173,7 +1198,6 @@
     const from = document.getElementById("filter-from").value;
     const to = document.getElementById("filter-to").value;
     const status = document.getElementById("filter-status").value;
-    const priority = document.getElementById("filter-priority").value;
     const dateFrom = document.getElementById("filter-date-from").value;
     const search = document
       .getElementById("filter-search")
@@ -1185,7 +1209,6 @@
       if (from && h.from !== from) ok = false;
       if (to && h.to !== to) ok = false;
       if (status && h.status !== status) ok = false;
-      if (priority && h.priority !== priority) ok = false;
       if (dateFrom && h.date < dateFrom) ok = false;
 
       if (search) {
@@ -1204,7 +1227,6 @@
     document.getElementById("filter-from").value = "";
     document.getElementById("filter-to").value = "";
     document.getElementById("filter-status").value = "";
-    document.getElementById("filter-priority").value = "";
     document.getElementById("filter-date-from").value = "";
     document.getElementById("filter-search").value = "";
     filteredHandovers = [...handovers];
@@ -1217,17 +1239,14 @@
     const completed = filteredHandovers.filter((h) => h.status === "Completed").length;
     const delayed = filteredHandovers.filter((h) => h.status === "Delayed").length;
 
-    document.getElementById("stat-total")?.textContent = total;
-    document.getElementById("stat-pending")?.textContent = pending;
-    document.getElementById("stat-completed")?.textContent = completed;
-    document.getElementById("stat-delayed")?.textContent = delayed;
+    document.getElementById("stat-total").textContent = total;
+    document.getElementById("stat-pending").textContent = pending;
+    document.getElementById("stat-completed").textContent = completed;
+    document.getElementById("stat-delayed").textContent = delayed;
   }
 
   function renderChart() {
-    const ctxEl = document.getElementById("status-chart");
-    if (!ctxEl) return; // chart moved to reports
-
-    const ctx = ctxEl.getContext("2d");
+    const ctx = document.getElementById("status-chart").getContext("2d");
 
     const pending = filteredHandovers.filter((h) => h.status === "Pending").length;
     const inProgress = filteredHandovers.filter(
@@ -1275,13 +1294,13 @@
 
   // ===== Reports =====
   function renderReports() {
-    const repTotal = document.getElementById("rep-total");
-    if (!repTotal) return;
-
     const total = handovers.length;
     const pending = handovers.filter(h => h.status === "Pending").length;
     const completed = handovers.filter(h => h.status === "Completed").length;
     const delayed = handovers.filter(h => h.status === "Delayed").length;
+
+    const repTotal = document.getElementById("rep-total");
+    if (!repTotal) return;
 
     document.getElementById("rep-total").textContent = total;
     document.getElementById("rep-pending").textContent = pending;
@@ -1386,10 +1405,8 @@
 
     const filterFrom = document.getElementById("filter-from");
     const filterTo = document.getElementById("filter-to");
-    if (filterFrom && filterTo) {
-      setSelectOptions(filterFrom, names, true, "All");
-      setSelectOptions(filterTo, names, true, "All");
-    }
+    setSelectOptions(filterFrom, names, true, "All");
+    setSelectOptions(filterTo, names, true, "All");
 
     if (inputFrom && inputTo && inputActionBy) {
       setSelectOptions(inputFrom, names, false);
@@ -1611,7 +1628,6 @@
   // ===== Users (employees) =====
   function renderUsers() {
     const tbody = document.getElementById("users-tbody");
-    if (!tbody) return;
     tbody.innerHTML = "";
     users.forEach((u, index) => {
       const tr = document.createElement("tr");
@@ -1846,83 +1862,89 @@
       input.click();
     });
 
-    input.addEventListener("change", (e) => {
+    input.addEventListener("change", async (e) => {
       const file = e.target.files[0];
       if (!file) return;
 
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        try {
-          const data = JSON.parse(evt.target.result);
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
 
-          if (Array.isArray(data.users)) {
-            users = data.users;
-          }
-          if (Array.isArray(data.handovers)) {
-            handovers = data.handovers;
-          }
-          if (Array.isArray(data.accounts)) {
-            accounts = data.accounts;
-          }
-
-          saveUsers();
-          saveHandovers();
-          saveAccounts();
-
-          filteredHandovers = [...handovers];
-
-          refreshUserSelectOptions();
-          renderUsers();
-          renderTable();
-          renderAccounts();
-          renderReports();
-
-          alert("JSON data imported successfully.");
-        } catch (err) {
-          console.error(err);
-          alert("Could not import JSON file. Please make sure it is a valid export JSON.");
-        } finally {
+        if (
+          !data ||
+          !Array.isArray(data.handovers) ||
+          !Array.isArray(data.users) ||
+          !Array.isArray(data.accounts)
+        ) {
+          alert(
+            "Invalid JSON structure.\nThe file must contain: handovers, users, and accounts arrays."
+          );
           input.value = "";
+          return;
         }
-      };
 
-      reader.readAsText(file);
+        const ok = confirm(
+          "This will replace all current data (handovers, users, accounts) in this browser with the data from the file.\nDo you want to continue?"
+        );
+        if (!ok) {
+          input.value = "";
+          return;
+        }
+
+        handovers = data.handovers;
+        users = data.users;
+        accounts = data.accounts;
+
+        saveHandovers();
+        saveUsers();
+        saveAccounts();
+
+        filteredHandovers = [...handovers];
+
+        renderUsers();
+        refreshUserSelectOptions();
+        renderTable();
+        renderAccounts();
+        renderReports();
+
+        alert("Data imported successfully.");
+      } catch (err) {
+        console.error(err);
+        alert("An error occurred while reading or parsing the JSON file.");
+      } finally {
+        input.value = "";
+      }
     });
   }
 
   // ===== DOMContentLoaded =====
   document.addEventListener("DOMContentLoaded", () => {
-    const topDate = document.getElementById("top-date");
-    if (topDate) {
-      topDate.value = new Date().toISOString().slice(0, 10);
-    }
+    document.getElementById("top-date").value =
+      new Date().toISOString().slice(0, 10);
 
     document
       .getElementById("btn-today")
-      ?.addEventListener("click", () => resetFilters());
+      .addEventListener("click", () => resetFilters());
 
     document
       .getElementById("filter-from")
-      ?.addEventListener("change", applyFilters);
+      .addEventListener("change", applyFilters);
     document
       .getElementById("filter-to")
-      ?.addEventListener("change", applyFilters);
+      .addEventListener("change", applyFilters);
     document
       .getElementById("filter-status")
-      ?.addEventListener("change", applyFilters);
-    document
-      .getElementById("filter-priority")
-      ?.addEventListener("change", applyFilters);
+      .addEventListener("change", applyFilters);
     document
       .getElementById("filter-date-from")
-      ?.addEventListener("change", applyFilters);
+      .addEventListener("change", applyFilters);
     document
       .getElementById("filter-search")
-      ?.addEventListener("input", applyFilters);
+      .addEventListener("input", applyFilters);
 
     document
       .getElementById("btn-reset-filters")
-      ?.addEventListener("click", resetFilters);
+      .addEventListener("click", resetFilters);
 
     loadUsers();
     loadHandovers();
