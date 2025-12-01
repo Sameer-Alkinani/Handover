@@ -152,14 +152,16 @@
     }
 
     .filters-grid {
+      /* تم تعديلها لتستوعب فلتر PRIORITY */
+      grid-template-columns: repeat(6, minmax(0, 1fr));
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 0.75rem;
     }
 
     .table-responsive {
       margin-top: 0.75rem;
-      max-height: 420px;
+      /* إزالة الحد 420px حتى يظهر المحتوى عند تكبير الكارد */
+      max-height: none;
       overflow: auto;
     }
 
@@ -402,6 +404,19 @@
               <option>Delayed</option>
             </select>
           </div>
+
+          <!-- NEW: Priority filter -->
+          <div>
+            <label class="form-label form-label-sm">Priority</label>
+            <select id="filter-priority" class="form-select form-select-sm">
+              <option value="">All</option>
+              <option value="P1">P1</option>
+              <option value="P2">P2</option>
+              <option value="P3">P3</option>
+              <option value="P4">P4</option>
+            </select>
+          </div>
+
           <div>
             <label class="form-label form-label-sm">Date From</label>
             <input
@@ -422,10 +437,9 @@
         </div>
       </section>
 
-      <!-- Table + Chart -->
+      <!-- Table (full width, chart تم نقله للتقارير) -->
       <div class="row mt-2 g-3">
-        <!-- Table -->
-        <div class="col-lg-8">
+        <div class="col-12">
           <section class="table-card table-card--resizable">
             <div class="d-flex justify-content-between align-items-center mb-2">
               <h6 class="mb-0">Handover List</h6>
@@ -455,16 +469,6 @@
                 </tbody>
               </table>
             </div>
-          </section>
-        </div>
-
-        <!-- Chart -->
-        <div class="col-lg-4">
-          <section class="chart-card">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <h6 class="mb-0">By Status</h6>
-            </div>
-            <canvas id="status-chart" height="220"></canvas>
           </section>
         </div>
       </div>
@@ -662,7 +666,7 @@
         </div>
       </div>
 
-      <!-- Charts -->
+      <!-- Charts row (existing) -->
       <div class="row g-3">
         <div class="col-lg-6">
           <div class="chart-card">
@@ -676,6 +680,17 @@
             <h6>Handovers by User</h6>
             <p class="text-muted mb-2">Number of handovers per Action By.</p>
             <canvas id="reports-user-chart" height="220"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- NEW: By Status bar chart moved from Dashboard -->
+      <div class="row g-3 mt-3">
+        <div class="col-12">
+          <div class="chart-card">
+            <h6>By Status</h6>
+            <p class="text-muted mb-2">Bar chart of handovers by status (affected by filters).</p>
+            <canvas id="status-chart" height="220"></canvas>
           </div>
         </div>
       </div>
@@ -1198,6 +1213,7 @@
     const from = document.getElementById("filter-from").value;
     const to = document.getElementById("filter-to").value;
     const status = document.getElementById("filter-status").value;
+    const priority = document.getElementById("filter-priority").value; // NEW
     const dateFrom = document.getElementById("filter-date-from").value;
     const search = document
       .getElementById("filter-search")
@@ -1209,6 +1225,7 @@
       if (from && h.from !== from) ok = false;
       if (to && h.to !== to) ok = false;
       if (status && h.status !== status) ok = false;
+      if (priority && h.priority !== priority) ok = false; // NEW
       if (dateFrom && h.date < dateFrom) ok = false;
 
       if (search) {
@@ -1227,6 +1244,7 @@
     document.getElementById("filter-from").value = "";
     document.getElementById("filter-to").value = "";
     document.getElementById("filter-status").value = "";
+    document.getElementById("filter-priority").value = ""; // NEW
     document.getElementById("filter-date-from").value = "";
     document.getElementById("filter-search").value = "";
     filteredHandovers = [...handovers];
@@ -1246,7 +1264,9 @@
   }
 
   function renderChart() {
-    const ctx = document.getElementById("status-chart").getContext("2d");
+    const canvas = document.getElementById("status-chart");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
 
     const pending = filteredHandovers.filter((h) => h.status === "Pending").length;
     const inProgress = filteredHandovers.filter(
@@ -1934,6 +1954,9 @@
       .addEventListener("change", applyFilters);
     document
       .getElementById("filter-status")
+      .addEventListener("change", applyFilters);
+    document
+      .getElementById("filter-priority")            // NEW
       .addEventListener("change", applyFilters);
     document
       .getElementById("filter-date-from")
