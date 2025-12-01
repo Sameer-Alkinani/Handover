@@ -151,15 +151,16 @@
       padding: 1rem 1.1rem;
     }
 
-    /* unified filters grid (From / To / Status / Priority / Date / Search) */
+    /* unified filters in one line: From / To / Status / Priority / Date / Search  */
     .filters-grid {
       display: grid;
       grid-template-columns: repeat(6, minmax(0, 1fr));
       gap: 0.75rem;
+      align-items: flex-end;
     }
 
     .filters-grid .filter-search-cell {
-      grid-column: span 2;
+      grid-column: span 1; /* no extra span so it stays in same row */
     }
 
     .table-card,
@@ -452,10 +453,9 @@
         </div>
       </section>
 
-      <!-- Table + Chart -->
+      <!-- Table (Handover List only on dashboard now) -->
       <div class="row mt-2 g-3">
-        <!-- Table -->
-        <div class="col-lg-8">
+        <div class="col-12">
           <section class="table-card">
             <div class="d-flex justify-content-between align-items-center mb-2">
               <h6 class="mb-0">Handover List</h6>
@@ -485,16 +485,6 @@
                 </tbody>
               </table>
             </div>
-          </section>
-        </div>
-
-        <!-- Chart -->
-        <div class="col-lg-4">
-          <section class="chart-card">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <h6 class="mb-0">By Status</h6>
-            </div>
-            <canvas id="status-chart"></canvas>
           </section>
         </div>
       </div>
@@ -695,6 +685,19 @@
             <h6>Handovers by User</h6>
             <p class="text-muted mb-2">Number of handovers per Action By.</p>
             <canvas id="reports-user-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Moved: By Status chart from dashboard to reports -->
+      <div class="row g-3 mt-1">
+        <div class="col-12">
+          <div class="chart-card">
+            <h6>By Status (Filtered)</h6>
+            <p class="text-muted mb-2">
+              Same view as dashboard By Status, using current filters.
+            </p>
+            <canvas id="status-chart"></canvas>
           </div>
         </div>
       </div>
@@ -1267,6 +1270,7 @@
     document.getElementById("stat-delayed").textContent = delayed;
   }
 
+  // By Status (moved to reports but still uses this function)
   function renderChart() {
     const canvas = document.getElementById("status-chart");
     if (!canvas) return;
