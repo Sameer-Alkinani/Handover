@@ -207,29 +207,12 @@
       color: #1d4ed8;
     }
 
-    /* === Dashboard: stretch Handover List & By Status with scroll === */
-    .view-section[data-view="dashboard"] .row.mt-2.g-3 {
-      height: calc(100vh - 260px); /* uses remaining height under header + filters */
-    }
-
-    .view-section[data-view="dashboard"] .table-card,
-    .view-section[data-view="dashboard"] .chart-card {
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .view-section[data-view="dashboard"] .table-card .table-responsive {
-      flex: 1;
-      overflow-y: auto;
-      min-height: 0;
-      max-height: none; /* override global max-height for dashboard main table */
-    }
-
-    .view-section[data-view="dashboard"] .chart-card canvas {
-      flex: 1;
-      height: auto !important;
-      max-height: 100%;
+    /* Allow manual resize of the Handover List card (only height) */
+    .table-card--resizable {
+      resize: vertical;
+      overflow: auto;
+      min-height: 220px;
+      max-height: 80vh;
     }
 
     @media (max-width: 992px) {
@@ -261,11 +244,6 @@
 
       .filters-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      /* On small screens, let height be natural to avoid layout issues */
-      .view-section[data-view="dashboard"] .row.mt-2.g-3 {
-        height: auto;
       }
     }
 
@@ -448,7 +426,7 @@
       <div class="row mt-2 g-3">
         <!-- Table -->
         <div class="col-lg-8">
-          <section class="table-card">
+          <section class="table-card table-card--resizable">
             <div class="d-flex justify-content-between align-items-center mb-2">
               <h6 class="mb-0">Handover List</h6>
               <span
@@ -1221,7 +1199,7 @@
     const to = document.getElementById("filter-to").value;
     const status = document.getElementById("filter-status").value;
     const dateFrom = document.getElementById("filter-date-from").value;
-       const search = document
+    const search = document
       .getElementById("filter-search")
       .value.toLowerCase();
 
