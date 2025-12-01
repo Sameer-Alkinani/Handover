@@ -152,16 +152,14 @@
     }
 
     .filters-grid {
-      /* تم تعديلها لتستوعب فلتر PRIORITY */
-      grid-template-columns: repeat(6, minmax(0, 1fr));
       display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
       gap: 0.75rem;
     }
 
     .table-responsive {
       margin-top: 0.75rem;
-      /* إزالة الحد 420px حتى يظهر المحتوى عند تكبير الكارد */
-      max-height: none;
+      max-height: 420px;
       overflow: auto;
     }
 
@@ -217,6 +215,11 @@
       max-height: 80vh;
     }
 
+    /* Reports page tuning */
+    .chart-card canvas {
+      max-height: 260px;
+    }
+
     @media (max-width: 992px) {
       .app-shell {
         flex-direction: column;
@@ -246,6 +249,10 @@
 
       .filters-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .chart-card {
+        padding: 0.75rem 0.85rem;
       }
     }
 
@@ -404,19 +411,16 @@
               <option>Delayed</option>
             </select>
           </div>
-
-          <!-- NEW: Priority filter -->
           <div>
             <label class="form-label form-label-sm">Priority</label>
             <select id="filter-priority" class="form-select form-select-sm">
               <option value="">All</option>
-              <option value="P1">P1</option>
-              <option value="P2">P2</option>
-              <option value="P3">P3</option>
-              <option value="P4">P4</option>
+              <option value="P1">P1 - High</option>
+              <option value="P2">P2 - Moderate</option>
+              <option value="P3">P3 - Low</option>
+              <option value="P4">P4 - Negligible</option>
             </select>
           </div>
-
           <div>
             <label class="form-label form-label-sm">Date From</label>
             <input
@@ -437,9 +441,9 @@
         </div>
       </section>
 
-      <!-- Table (full width, chart تم نقله للتقارير) -->
+      <!-- Table (list only – chart moved to Reports) -->
       <div class="row mt-2 g-3">
-        <div class="col-12">
+        <div class="col-lg-8">
           <section class="table-card table-card--resizable">
             <div class="d-flex justify-content-between align-items-center mb-2">
               <h6 class="mb-0">Handover List</h6>
@@ -640,25 +644,25 @@
 
       <!-- KPIs -->
       <div class="row g-3 mb-3">
-        <div class="col-md-3">
+        <div class="col-lg-3 col-md-6">
           <div class="stat-card">
             <span class="stat-label">Total Handovers</span>
             <div class="stat-value" id="rep-total">0</div>
           </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-lg-3 col-md-6">
           <div class="stat-card">
             <span class="stat-label">Completed</span>
             <div class="stat-value text-success" id="rep-completed">0</div>
           </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-lg-3 col-md-6">
           <div class="stat-card">
             <span class="stat-label">Pending</span>
             <div class="stat-value text-warning" id="rep-pending">0</div>
           </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-lg-3 col-md-6">
           <div class="stat-card">
             <span class="stat-label">Delayed</span>
             <div class="stat-value text-danger" id="rep-delayed">0</div>
@@ -666,7 +670,7 @@
         </div>
       </div>
 
-      <!-- Charts row (existing) -->
+      <!-- Charts -->
       <div class="row g-3">
         <div class="col-lg-6">
           <div class="chart-card">
@@ -684,12 +688,14 @@
         </div>
       </div>
 
-      <!-- NEW: By Status bar chart moved from Dashboard -->
+      <!-- By Status bar chart (all data) -->
       <div class="row g-3 mt-3">
         <div class="col-12">
           <div class="chart-card">
             <h6>By Status</h6>
-            <p class="text-muted mb-2">Bar chart of handovers by status (affected by filters).</p>
+            <p class="text-muted mb-2">
+              Overall handovers by status (all records).
+            </p>
             <canvas id="status-chart" height="220"></canvas>
           </div>
         </div>
@@ -1213,7 +1219,7 @@
     const from = document.getElementById("filter-from").value;
     const to = document.getElementById("filter-to").value;
     const status = document.getElementById("filter-status").value;
-    const priority = document.getElementById("filter-priority").value; // NEW
+    const priority = document.getElementById("filter-priority").value;
     const dateFrom = document.getElementById("filter-date-from").value;
     const search = document
       .getElementById("filter-search")
@@ -1225,7 +1231,7 @@
       if (from && h.from !== from) ok = false;
       if (to && h.to !== to) ok = false;
       if (status && h.status !== status) ok = false;
-      if (priority && h.priority !== priority) ok = false; // NEW
+      if (priority && h.priority !== priority) ok = false;
       if (dateFrom && h.date < dateFrom) ok = false;
 
       if (search) {
@@ -1244,7 +1250,7 @@
     document.getElementById("filter-from").value = "";
     document.getElementById("filter-to").value = "";
     document.getElementById("filter-status").value = "";
-    document.getElementById("filter-priority").value = ""; // NEW
+    document.getElementById("filter-priority").value = "";
     document.getElementById("filter-date-from").value = "";
     document.getElementById("filter-search").value = "";
     filteredHandovers = [...handovers];
@@ -1263,17 +1269,16 @@
     document.getElementById("stat-delayed").textContent = delayed;
   }
 
+  // ✅ By Status chart now uses ALL handovers (not filtered)
   function renderChart() {
     const canvas = document.getElementById("status-chart");
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
 
-    const pending = filteredHandovers.filter((h) => h.status === "Pending").length;
-    const inProgress = filteredHandovers.filter(
-      (h) => h.status === "In Progress"
-    ).length;
-    const completed = filteredHandovers.filter((h) => h.status === "Completed").length;
-    const delayed = filteredHandovers.filter((h) => h.status === "Delayed").length;
+    const pending = handovers.filter((h) => h.status === "Pending").length;
+    const inProgress = handovers.filter((h) => h.status === "In Progress").length;
+    const completed = handovers.filter((h) => h.status === "Completed").length;
+    const delayed = handovers.filter((h) => h.status === "Delayed").length;
 
     if (statusChart) {
       statusChart.destroy();
@@ -1956,7 +1961,7 @@
       .getElementById("filter-status")
       .addEventListener("change", applyFilters);
     document
-      .getElementById("filter-priority")            // NEW
+      .getElementById("filter-priority")
       .addEventListener("change", applyFilters);
     document
       .getElementById("filter-date-from")
