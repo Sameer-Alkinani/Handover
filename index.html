@@ -1177,10 +1177,10 @@
     const empName = acc.employeeName?.trim() || "";
     if (!empName) return [];
 
+    // تعديل: المستخدم العادي يرى فقط الهاند أوفر التي هو أنشأها (actionBy)
     return handovers.filter(h => {
       const actionByName = (h.actionBy || "").trim();
-      const toName = (h.to || "").trim();
-      return actionByName === empName || toName === empName;
+      return actionByName === empName;
     });
   }
 
