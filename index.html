@@ -1953,6 +1953,19 @@
     }
   }
 
+  // === تفعيل/تعطيل فورم Users / Employees حسب دور المستخدم ===
+  function setUserFormAccess() {
+    const form = document.getElementById("user-form");
+    if (!form) return;
+    const acc = getLoggedInAccount();
+    const isAdmin = acc && acc.role === "Admin";
+
+    const controls = form.querySelectorAll("input, button, select, textarea");
+    controls.forEach(el => {
+      el.disabled = !isAdmin;
+    });
+  }
+
   function initHandoverModal() {
     const modalEl = document.getElementById("handover-modal");
     handoverModal = new bootstrap.Modal(modalEl);
@@ -2261,6 +2274,13 @@
 
     form.addEventListener("submit", e => {
       e.preventDefault();
+
+      const acc = getLoggedInAccount();
+      if (!acc || acc.role !== "Admin") {
+        alert("Only Admin can add users.");
+        return;
+      }
+
       const name = nameInput.value.trim();
       const role = roleInput.value.trim();
       const email = emailInput.value.trim();
@@ -2518,6 +2538,7 @@
       select.value = activeAccountUsername;
     }
     updateCurrentUserLabel();
+    setUserFormAccess(); // تحديث صلاحية فورم Users / Employees
   }
 
   function updateCurrentUserLabel() {
@@ -2711,6 +2732,7 @@
       filteredHandovers = [];
       updateCurrentUserLabel();
       showLoginPage();
+      setUserFormAccess(); // تأمين الفورم بعد تسجيل الخروج
     });
   }
 
@@ -2770,6 +2792,7 @@
 
     initLogin();
     renderDeletedHandovers();
+    setUserFormAccess(); // حالة البداية (قبل تسجيل الدخول)
   });
 </script>
 </body>
