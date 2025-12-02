@@ -1262,13 +1262,13 @@
     return false; // Viewer
   }
 
-  // رقم تسلسلي TASK-YY-MM-XXXX بدون تكرار حتى مع الحذف
+  // رقم تسلسلي HNDR-YY-MM-XXXX بدون تكرار حتى مع الحذف
   function generateNextId() {
     const today = new Date();
     const year = String(today.getFullYear()).slice(-2);           // مثال: 2025 → "25"
     const month = String(today.getMonth() + 1).padStart(2, "0"); // 1 → "01", 12 → "12"
 
-    const storageKey = "warehouseLastTaskIdMap";
+    const storageKey = "warehouseLastHNDRIdMap";
     let map = {};
 
     // قراءة آخر الأرقام من localStorage (لكل سنة-شهر)
@@ -1291,7 +1291,7 @@
 
     const serial = String(next).padStart(4, "0"); // 1 → "0001"
 
-    return `TASK-${year}-${month}-${serial}`;  // الشكل النهائي: TASK-25-12-0001
+    return `HNDR-${year}-${month}-${serial}`;  // الشكل النهائي: HNDR-25-12-0001
   }
 
   function getStatusClass(status) {
@@ -1359,7 +1359,7 @@
           ${h.actionBy || ""}
           ${
             isAssignedToUser
-              ? `<span class="badge bg-primary-subtle text-primary ms-1" title="Task assigned to you">Assigned to you</span>`
+              ? `<span class="badge bg-primary-subtle text-primary ms-1" title="HNDR assigned to you">Assigned to you</span>`
               : ""
           }
         </td>
@@ -1434,7 +1434,7 @@
           ${h.actionBy || ""}
           ${
             isAssignedToUser
-              ? `<span class="badge bg-primary-subtle text-primary ms-1" title="Task assigned to you">Assigned to you</span>`
+              ? `<span class="badge bg-primary-subtle text-primary ms-1" title="HNDR assigned to you">Assigned to you</span>`
               : ""
           }
         </td>
