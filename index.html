@@ -1036,45 +1036,31 @@
 <script>
   const MAX_ATTACHMENT_SIZE = 3 * 1024 * 1024; // ~3MB
 
-  // NEW: key for HNDR ID counters in localStorage (global serial)
-  const ID_COUNTER_STORAGE_KEY = "warehouseLastHndrIdMap";
+  // مفتاح التخزين للتسلسل (رقم واحد عام)
+  const ID_COUNTER_STORAGE_KEY = "warehouseLastHndrSerial";
 
-  // NEW: load global last serial from localStorage
-  function loadIdCounterMap() {
-    let last = 0;
+  // قراءة آخر تسلسل من التخزين
+  function loadIdCounter() {
     try {
       const stored = localStorage.getItem(ID_COUNTER_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-
-        if (typeof parsed === "number") {
-          // الشكل الجديد: رقم واحد فقط
-          last = parsed;
-        } else if (parsed && typeof parsed === "object") {
-          // الشكل القديم (object حسب السنة/الشهر) → نأخذ أكبر قيمة
-          last = Object.values(parsed).reduce(
-            (max, v) => (typeof v === "number" && v > max ? v : max),
-            0
-          );
-        }
-      }
+      const num = parseInt(stored, 10);
+      return isNaN(num) ? 0 : num;
     } catch (e) {
-      last = 0;
+      return 0;
     }
-    return last;
   }
 
-  // NEW: save global last serial to localStorage
-  function saveIdCounterMap(last) {
+  // حفظ آخر تسلسل
+  function saveIdCounter(last) {
     try {
-      localStorage.setItem(ID_COUNTER_STORAGE_KEY, JSON.stringify(last || 0));
+      localStorage.setItem(ID_COUNTER_STORAGE_KEY, String(last || 0));
     } catch (e) {
       // ignore
     }
   }
 
-  // NEW: normalize IDs in a list to HNDR-YY-MM-XXXX based on date
-  // مع تسلسل واحد مستمر حتى لو اختلف الشهر
+  // إعادة تسلسل قائمة معيّنة حسب ترتيبها (تستخدم التاريخ داخل كل عنصر)
+  // تسلسل واحد مستمر حتى لو اختلف الشهر
   function normalizeIdsForList(list, lastSerial) {
     if (!Array.isArray(list) || list.length === 0) return lastSerial;
 
@@ -1085,23 +1071,44 @@
 
       let yy, mm;
       const dateStr = h.date || "";
-      const dateMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
-      if (dateMatch) {
-        yy = dateMatch[1].slice(-2);
-        mm = dateMatch[2];
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
+      if (m) {
+        yy = m[1].slice(-2); // آخر رقمين من السنة
+        mm = m[2];           // الشهر بصيغة 01–12
       } else {
-        // fallback: اليوم
         const today = new Date();
         yy = String(today.getFullYear()).slice(-2);
         mm = String(today.getMonth() + 1).padStart(2, "0");
       }
 
       counter += 1;
-      const serial = String(counter).padStart(4, "0");
-      h.id = "HNDR-" + yy + "-" + mm + "-" + serial;
+      const serial = String(counter).padStart(4, "0"); // 1 → 0001
+      h.id = `HNDR-${yy}-${mm}-${serial}`;
     });
 
     return counter;
+  }
+
+  // إعادة تسلسل كل المهام الموجودة حالياً (handovers + deletedHandovers)
+  // بحيث تبدأ من 0001 حسب التاريخ
+  function resequenceAllHandoverIdsFromOne() {
+    const all = [...handovers, ...deletedHandovers];
+    if (all.length === 0) {
+      saveIdCounter(0);
+      return;
+    }
+
+    // ترتيب حسب التاريخ تصاعدياً، ثم حسب الـ id الحالي كاحتياط
+    all.sort((a, b) => {
+      const da = a.date || "";
+      const db = b.date || "";
+      if (da && db && da !== db) return da.localeCompare(db);
+      return (a.id || "").localeCompare(b.id || "");
+    });
+
+    let lastSerial = 0;
+    lastSerial = normalizeIdsForList(all, lastSerial);
+    saveIdCounter(lastSerial);
   }
 
   const defaultUsers = [
@@ -1109,7 +1116,7 @@
     { name: "Ardasher A. Ahmad",   role: "Supervisor", email: "" },
   ];
 
-  // تم ضبط التاريخ على شهر 09/2025 ليبدأ التسلسل من HNDR-25-09-0001
+  // افتراضياً التاريخ في شهر 9 / 2025 حتى يكون أول تسلسل من هناك
   const defaultHandovers = [
     {
       id: "HNDR-25-09-0001",
@@ -1210,13 +1217,6 @@
     } else {
       handovers = [...defaultHandovers];
     }
-
-    // normalize all IDs to HNDR-YY-MM-XXXX based on date (global sequential)
-    let lastSerial = loadIdCounterMap();
-    lastSerial = normalizeIdsForList(handovers, lastSerial);
-    saveIdCounterMap(lastSerial);
-    saveHandovers(); // persist converted IDs
-
     filteredHandovers = [...handovers];
   }
 
@@ -1235,12 +1235,6 @@
     } else {
       deletedHandovers = [];
     }
-
-    // normalize IDs for deleted handovers too (continuing same global sequence)
-    let lastSerial = loadIdCounterMap();
-    lastSerial = normalizeIdsForList(deletedHandovers, lastSerial);
-    saveIdCounterMap(lastSerial);
-    saveDeletedHandovers();
   }
 
   function saveDeletedHandovers() {
@@ -1314,12 +1308,10 @@
     const acc = getLoggedInAccount();
     if (!acc) return [];
 
-    // Admin & Supervisor see all
     if (acc.role === "Admin" || acc.role === "Supervisor") {
       return handovers;
     }
 
-    // User sees only handovers where he/she is actionBy
     const empName = acc.employeeName?.trim() || "";
     if (!empName) return [];
 
@@ -1329,7 +1321,6 @@
     });
   }
 
-  // User can edit if he is actionBy OR To (besides admin/supervisor)
   function canEditHandover(h) {
     const acc = getLoggedInAccount();
     if (!acc) return false;
@@ -1341,26 +1332,23 @@
     if (acc.role === "User") {
       return h.actionBy === empName || h.to === empName;
     }
-    return false; // Viewer
+    return false;
   }
 
-  // Sequential HNDR-YY-MM-XXXX without duplication even with deletions
+  // توليد ID جديد للتسليم التالي (يعتمد على التسلسل المخزَّن)
   function generateNextId() {
     const today = new Date();
-    const year = String(today.getFullYear()).slice(-2);          // e.g. 2025 → "25"
-    const month = String(today.getMonth() + 1).padStart(2, "0"); // 1 → "01", 12 → "12"
+    const year = String(today.getFullYear()).slice(-2);
+    const month = String(today.getMonth() + 1).padStart(2, "0");
 
-    // نقرأ آخر تسلسل global من localStorage
-    let lastSerial = loadIdCounterMap();
+    let lastSerial = loadIdCounter();
     if (typeof lastSerial !== "number" || isNaN(lastSerial)) {
       lastSerial = 0;
     }
     lastSerial += 1;
-    saveIdCounterMap(lastSerial);
+    saveIdCounter(lastSerial);
 
-    const serial = String(lastSerial).padStart(4, "0"); // 1 → "0001"
-
-    // Final format: HNDR-25-10-0003 مثلاً
+    const serial = String(lastSerial).padStart(4, "0");
     return `HNDR-${year}-${month}-${serial}`;
   }
 
@@ -1407,7 +1395,6 @@
         `;
       }
 
-      // Delete button for Admin only
       if (isAdmin) {
         actionsHtml += `
           <button class="btn btn-sm btn-outline-danger btn-delete-handover" data-id="${h.id}" title="Delete">
@@ -1527,7 +1514,7 @@
     });
 
     if (countEl) {
-      countEl.textContent = completed.length + "records";
+      countEl.textContent = completed.length + " records";
     }
   }
 
@@ -1611,7 +1598,6 @@
       });
     });
 
-    // Delete: move to Deleted Handovers page
     document.querySelectorAll(".btn-delete-handover").forEach(btn => {
       btn.addEventListener("click", () => {
         const acc = getLoggedInAccount();
@@ -1993,7 +1979,6 @@
     };
   }
 
-  // From always disabled (read-only)
   function setHandoverFormReadOnly(readOnly) {
     const fields = [
       inputTo,
@@ -2549,7 +2534,7 @@
     accountEmployeeSelect.value = acc.employeeName || "";
     accountRoleSelect.value = acc.role || "User";
     accountStatusSelect.value = acc.status || "Active";
-    accountPasswordInput.value = ""; // do not show current password
+    accountPasswordInput.value = "";
     accountModal.show();
   }
 
@@ -2746,15 +2731,11 @@
         accounts = data.accounts;
         normalizeAccountsPasswords();
 
-        // بعد الاستيراد، نعيد تسلسل IDs كلها حسب النظام الجديد
-        let lastSerial = 0;
-        lastSerial = normalizeIdsForList(handovers, lastSerial);
-        lastSerial = normalizeIdsForList(deletedHandovers, lastSerial);
-        saveIdCounterMap(lastSerial);
-
+        // إعادة تسلسل لكل المهام المستوردة لتبدأ من 1 حسب التاريخ
+        deletedHandovers = []; // في ملف الاستيراد الحالي لا نملك deleted، إن وجدت يمكنك إضافتها
+        resequenceAllHandoverIdsFromOne();
         saveHandovers();
-        saveUsers();
-        saveAccounts();
+        saveDeletedHandovers();
 
         filteredHandovers = getVisibleHandovers();
 
@@ -2825,9 +2806,15 @@
 
     loadUsers();
     loadHandovers();
+    loadDeletedHandovers();
+
+    // هنا يتم إعادة تسلسل كل المهام الحالية لتبدأ من 1 حسب التاريخ
+    resequenceAllHandoverIdsFromOne();
+    saveHandovers();
+    saveDeletedHandovers();
+
     loadAccounts();
     loadActiveAccount();
-    loadDeletedHandovers();
 
     initSidebarNavigation();
     initUserForm();
