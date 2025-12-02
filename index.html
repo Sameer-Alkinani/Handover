@@ -1,7 +1,5 @@
 <script>
   // ===== Firebase Setup =====
-  // TODO: replace this config with your real Firebase config from the Firebase console
-  // (Project settings -> Your apps -> Web app)
   const firebaseConfig = {
     apiKey: "YOUR_API_KEY_HERE",
     authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
@@ -13,10 +11,15 @@
 
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
-  const ACCOUNTS_COLLECTION = "handover_accounts";
+
+  const COL_ACCOUNTS = "handover_accounts";
+  const COL_USERS = "handover_users";
+  const COL_HANDOVERS = "handover_handovers";
+  const COL_DELETED = "handover_deleted_handovers";
 
   const MAX_ATTACHMENT_SIZE = 3 * 1024 * 1024; // ~3MB
 
+  // ===== Default seed data =====
   const defaultUsers = [
     { name: "Sameer Jabbar",       role: "Manager",    email: "sameer_jabbar@yahoo.com" },
     { name: "Ardasher A. Ahmad",   role: "Supervisor", email: "" },
@@ -24,7 +27,7 @@
 
   const defaultHandovers = [
     {
-      id: "HNDR-001",
+      id: "HNDR-001", // will be converted when seeding
       from: "Sameer Jabbar",
       to: "Ardasher A. Ahmad",
       items: "120 cartons of Product A",
@@ -65,6 +68,7 @@
     },
   ];
 
+  // ===== In-memory data =====
   let handovers = [];
   let filteredHandovers = [];
   let deletedHandovers = [];
@@ -94,24 +98,7 @@
 
   let activeAccountUsername = null;
 
-  function loadUsers() {
-    const saved = localStorage.getItem("warehouseUsers");
-    if (saved) {
-      try {
-        users = JSON.parse(saved);
-      } catch {
-        users = [...defaultUsers];
-      }
-    } else {
-      users = [...defaultUsers];
-    }
-  }
-
-  function saveUsers() {
-    localStorage.setItem("warehouseUsers", JSON.stringify(users));
-  }
-
-  // ===== ID generator: HNDR-YY-MM-XXXX + convert old IDs =====
+  // ===== ID generator: HNDR-YY-MM-XXXX =====
   const ID_STORAGE_KEY = "warehouseLastHndrIdMap";
 
   function getNextSerialForYm(year2, month2) {
@@ -135,83 +122,136 @@
     return String(next).padStart(4, "0");
   }
 
-  // All new IDs: HNDR-YY-MM-XXXX
+  function generateNextIdForDate(dateStr) {
+    let yy, mm;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      yy = dateStr.slice(2, 4);
+      mm = dateStr.slice(5, 7);
+    } else {
+      const today = new Date();
+      yy = String(today.getFullYear()).slice(-2);
+      mm = String(today.getMonth() + 1).padStart(2, "0");
+    }
+    const serial = getNextSerialForYm(yy, mm);
+    return `HNDR-${yy}-${mm}-${serial}`;
+  }
+
+  // All new IDs use today's date
   function generateNextId() {
     const today = new Date();
-    const year2 = String(today.getFullYear()).slice(-2);      // e.g. 2025 -> "25"
-    const month2 = String(today.getMonth() + 1).padStart(2, "0"); // 1 -> "01"
-    const serial = getNextSerialForYm(year2, month2);
-    return `HNDR-${year2}-${month2}-${serial}`;
+    const yy = String(today.getFullYear()).slice(-2);
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const serial = getNextSerialForYm(yy, mm);
+    return `HNDR-${yy}-${mm}-${serial}`;
   }
 
-  // Convert old IDs (HNDR-001, TASK-..., etc.) to HNDR-YY-MM-XXXX based on date
-  function convertOldIdsToNewFormat() {
-    if (!Array.isArray(handovers)) return;
-
-    handovers.forEach(h => {
-      if (!h.id) return;
-
-      // Already in new format? e.g. HNDR-25-12-0001
-      if (/^HNDR-\d{2}-\d{2}-\d{4}$/.test(h.id)) return;
-
-      const dateStr = h.date || "";
-      let yy = "00";
-      let mm = "00";
-
-      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-        yy = dateStr.slice(2, 4);   // "2025-11-20" -> "25"
-        mm = dateStr.slice(5, 7);   // "2025-11-20" -> "11"
+  // ===== Users (employees) from Firestore =====
+  async function loadUsers() {
+    try {
+      const snap = await db.collection(COL_USERS).get();
+      if (snap.empty) {
+        // seed defaults
+        users = [...defaultUsers];
+        const batch = db.batch();
+        users.forEach(u => {
+          const docRef = db.collection(COL_USERS).doc(u.name);
+          batch.set(docRef, u);
+        });
+        await batch.commit();
       } else {
-        const today = new Date();
-        yy = String(today.getFullYear()).slice(-2);
-        mm = String(today.getMonth() + 1).padStart(2, "0");
+        users = snap.docs.map(doc => doc.data());
       }
-
-      const serial = getNextSerialForYm(yy, mm);
-      h.id = `HNDR-${yy}-${mm}-${serial}`;
-    });
-
-    saveHandovers();
-  }
-
-  function loadHandovers() {
-    const saved = localStorage.getItem("warehouseHandovers");
-    if (saved) {
-      try {
-        handovers = JSON.parse(saved);
-      } catch {
-        handovers = [...defaultHandovers];
-      }
-    } else {
-      handovers = [...defaultHandovers];
+    } catch (e) {
+      console.error("Error loading users, using defaults:", e);
+      users = [...defaultUsers];
     }
-    filteredHandovers = [...handovers];
-
-    // Convert any old IDs to the new HNDR-YY-MM-XXXX format on load
-    convertOldIdsToNewFormat();
   }
 
-  function saveHandovers() {
-    localStorage.setItem("warehouseHandovers", JSON.stringify(handovers));
+  async function saveUsers() {
+    try {
+      const batch = db.batch();
+      users.forEach(u => {
+        const docRef = db.collection(COL_USERS).doc(u.name);
+        batch.set(docRef, u);
+      });
+      await batch.commit();
+    } catch (e) {
+      console.error("Error saving users:", e);
+    }
   }
 
-  function loadDeletedHandovers() {
-    const saved = localStorage.getItem("warehouseDeletedHandovers");
-    if (saved) {
-      try {
-        deletedHandovers = JSON.parse(saved);
-      } catch {
-        deletedHandovers = [];
+  // ===== Handovers from Firestore =====
+  async function loadHandovers() {
+    try {
+      const snap = await db.collection(COL_HANDOVERS).get();
+      if (snap.empty) {
+        // seed default handovers, convert IDs to new format
+        handovers = defaultHandovers.map(h => {
+          const newId = generateNextIdForDate(h.date || "");
+          return { ...h, id: newId };
+        });
+        const batch = db.batch();
+        handovers.forEach(h => {
+          const docRef = db.collection(COL_HANDOVERS).doc(h.id);
+          batch.set(docRef, h);
+        });
+        await batch.commit();
+      } else {
+        handovers = snap.docs.map(doc => doc.data());
       }
-    } else {
+      filteredHandovers = [...handovers];
+    } catch (e) {
+      console.error("Error loading handovers, seeding defaults:", e);
+      handovers = defaultHandovers.map(h => {
+        const newId = generateNextIdForDate(h.date || "");
+        return { ...h, id: newId };
+      });
+      filteredHandovers = [...handovers];
+    }
+  }
+
+  async function saveHandovers() {
+    try {
+      const batch = db.batch();
+      handovers.forEach(h => {
+        const docRef = db.collection(COL_HANDOVERS).doc(h.id);
+        batch.set(docRef, h);
+      });
+      await batch.commit();
+    } catch (e) {
+      console.error("Error saving handovers:", e);
+    }
+  }
+
+  // ===== Deleted Handovers from Firestore =====
+  async function loadDeletedHandovers() {
+    try {
+      const snap = await db.collection(COL_DELETED).get();
+      if (snap.empty) {
+        deletedHandovers = [];
+      } else {
+        deletedHandovers = snap.docs.map(doc => doc.data());
+      }
+    } catch (e) {
+      console.error("Error loading deleted handovers:", e);
       deletedHandovers = [];
     }
   }
 
-  function saveDeletedHandovers() {
-    localStorage.setItem("warehouseDeletedHandovers", JSON.stringify(deletedHandovers));
+  async function saveDeletedHandovers() {
+    try {
+      const batch = db.batch();
+      deletedHandovers.forEach(h => {
+        const docRef = db.collection(COL_DELETED).doc(h.id);
+        batch.set(docRef, h);
+      });
+      await batch.commit();
+    } catch (e) {
+      console.error("Error saving deleted handovers:", e);
+    }
   }
 
+  // ===== Accounts from Firestore =====
   function normalizeAccountsPasswords() {
     accounts.forEach(acc => {
       if (typeof acc.password === "undefined" || acc.password === null) {
@@ -220,28 +260,24 @@
     });
   }
 
-  // ===== Accounts from Firestore (shared) =====
   async function loadAccounts() {
     try {
-      const snapshot = await db.collection(ACCOUNTS_COLLECTION).get();
-
-      if (snapshot.empty) {
-        // No accounts yet in Firestore → seed with defaultAccounts
+      const snap = await db.collection(COL_ACCOUNTS).get();
+      if (snap.empty) {
         accounts = [...defaultAccounts];
         normalizeAccountsPasswords();
-
         const batch = db.batch();
         accounts.forEach(acc => {
-          const ref = db.collection(ACCOUNTS_COLLECTION).doc(acc.username);
-          batch.set(ref, acc);
+          const docRef = db.collection(COL_ACCOUNTS).doc(acc.username);
+          batch.set(docRef, acc);
         });
         await batch.commit();
       } else {
-        accounts = snapshot.docs.map(doc => doc.data());
+        accounts = snap.docs.map(doc => doc.data());
         normalizeAccountsPasswords();
       }
     } catch (e) {
-      console.error("Error loading accounts from Firestore, falling back to defaults:", e);
+      console.error("Error loading accounts, using defaults:", e);
       accounts = [...defaultAccounts];
       normalizeAccountsPasswords();
     }
@@ -251,15 +287,13 @@
     try {
       normalizeAccountsPasswords();
       const batch = db.batch();
-
       accounts.forEach(acc => {
-        const ref = db.collection(ACCOUNTS_COLLECTION).doc(acc.username);
-        batch.set(ref, acc);
+        const docRef = db.collection(COL_ACCOUNTS).doc(acc.username);
+        batch.set(docRef, acc);
       });
-
       await batch.commit();
     } catch (e) {
-      console.error("Error saving accounts to Firestore:", e);
+      console.error("Error saving accounts:", e);
     }
   }
 
@@ -303,12 +337,10 @@
     const acc = getLoggedInAccount();
     if (!acc) return [];
 
-    // Admin & Supervisor can see all
     if (acc.role === "Admin" || acc.role === "Supervisor") {
       return handovers;
     }
 
-    // User: only handovers where he is actionBy
     const empName = acc.employeeName?.trim() || "";
     if (!empName) return [];
 
@@ -318,7 +350,6 @@
     });
   }
 
-  // User can edit if he is actionBy OR To (besides admin/supervisor)
   function canEditHandover(h) {
     const acc = getLoggedInAccount();
     if (!acc) return false;
@@ -330,7 +361,7 @@
     if (acc.role === "User") {
       return h.actionBy === empName || h.to === empName;
     }
-    return false; // Viewer
+    return false;
   }
 
   function getStatusClass(status) {
@@ -360,7 +391,6 @@
     filteredHandovers.forEach(h => {
       const linkUrl = h.attachmentDataUrl || h.attachmentUrl || null;
       const canEdit = canEditHandover(h);
-
       const isAssignedToUser = empName && h.actionBy === empName;
 
       let actionsHtml = `
@@ -376,7 +406,6 @@
         `;
       }
 
-      // Delete button for Admin only
       if (isAdmin) {
         actionsHtml += `
           <button class="btn btn-sm btn-outline-danger btn-delete-handover" data-id="${h.id}" title="Delete">
@@ -566,7 +595,7 @@
     });
 
     document.querySelectorAll(".btn-complete").forEach(btn => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", async () => {
         const id = btn.getAttribute("data-id");
         const h = handovers.find(x => x.id === id);
         if (!h) return;
@@ -575,13 +604,13 @@
           return;
         }
         h.status = "Completed";
-        saveHandovers();
+        await saveHandovers();
         applyFilters();
       });
     });
 
     document.querySelectorAll(".btn-delete-handover").forEach(btn => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", async () => {
         const acc = getLoggedInAccount();
         if (!acc || acc.role !== "Admin") {
           alert("Only Admin can delete handovers.");
@@ -597,8 +626,8 @@
         handovers = handovers.filter(x => x.id !== id);
         deletedHandovers.push(h);
 
-        saveHandovers();
-        saveDeletedHandovers();
+        await saveHandovers();
+        await saveDeletedHandovers();
 
         applyFilters();
         renderDeletedHandovers();
@@ -608,7 +637,7 @@
 
   function attachDeletedRowActions() {
     document.querySelectorAll(".btn-restore-handover").forEach(btn => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", async () => {
         const acc = getLoggedInAccount();
         if (!acc || acc.role !== "Admin") {
           alert("Only Admin can restore handovers.");
@@ -626,8 +655,8 @@
         deletedHandovers.splice(idx, 1);
         handovers.push(h);
 
-        saveHandovers();
-        saveDeletedHandovers();
+        await saveHandovers();
+        await saveDeletedHandovers();
 
         filteredHandovers = getVisibleHandovers();
         applyFilters();
@@ -908,7 +937,6 @@
     fillAccountEmployeeOptions();
   }
 
-  // From always disabled (set to logged-in employee when creating)
   function setupFromForNewHandover() {
     if (!inputFrom) return;
 
@@ -1044,7 +1072,6 @@
         inputPriority.value = "P3";
 
         refreshUserSelectOptions();
-
         setupFromForNewHandover();
 
         if (users.length > 0) {
@@ -1114,7 +1141,7 @@
 
       if (file) {
         if (file.size > MAX_ATTACHMENT_SIZE) {
-          alert("Attachment is too large to save in the browser (max ~3MB). Please attach a smaller file.");
+          alert("Attachment is too large to save (max ~3MB). Please attach a smaller file.");
           return;
         }
         attachmentName = file.name;
@@ -1160,7 +1187,7 @@
         });
       }
 
-      saveHandovers();
+      await saveHandovers();
       applyFilters();
       handoverModal.hide();
       attachmentInput.value = "";
@@ -1258,9 +1285,10 @@
     });
   }
 
-  // ===== Employees =====
-  function renderUsers() {
+  // ===== Employees (users table) =====
+  function renderUsersTable() {
     const tbody = document.getElementById("users-tbody");
+    if (!tbody) return;
     tbody.innerHTML = "";
     users.forEach((u, index) => {
       const tr = document.createElement("tr");
@@ -1296,15 +1324,15 @@
     const roleInput = document.getElementById("user-role");
     const emailInput = document.getElementById("user-email");
 
-    form.addEventListener("submit", e => {
+    form.addEventListener("submit", async e => {
       e.preventDefault();
       const name = nameInput.value.trim();
       const role = roleInput.value.trim();
       const email = emailInput.value.trim();
       if (!name) return;
       users.push({ name, role, email });
-      saveUsers();
-      renderUsers();
+      await saveUsers();
+      renderUsersTable();
       refreshUserSelectOptions();
       nameInput.value = "";
       roleInput.value = "";
@@ -1320,7 +1348,7 @@
     editUserRoleInput = document.getElementById("edit-user-role");
     editUserEmailInput = document.getElementById("edit-user-email");
 
-    userEditForm.addEventListener("submit", e => {
+    userEditForm.addEventListener("submit", async e => {
       e.preventDefault();
       if (editingUserIndex === null) return;
       const name = editUserNameInput.value.trim();
@@ -1328,8 +1356,8 @@
       const email = editUserEmailInput.value.trim();
       if (!name) return;
       users[editingUserIndex] = { name, role, email };
-      saveUsers();
-      renderUsers();
+      await saveUsers();
+      renderUsersTable();
       refreshUserSelectOptions();
       userModal.hide();
     });
@@ -1392,7 +1420,7 @@
     });
 
     document.querySelectorAll(".btn-delete-account").forEach(btn => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", async () => {
         const idx = parseInt(btn.getAttribute("data-index"), 10);
         const acc = accounts[idx];
         if (!acc) return;
@@ -1400,7 +1428,7 @@
         if (!ok) return;
 
         accounts.splice(idx, 1);
-        saveAccounts();
+        await saveAccounts();
         renderAccounts();
         refreshActiveAccountSelect();
 
@@ -1461,7 +1489,7 @@
       });
     }
 
-    accountForm.addEventListener("submit", e => {
+    accountForm.addEventListener("submit", async e => {
       e.preventDefault();
 
       const accLogged = getLoggedInAccount();
@@ -1491,7 +1519,7 @@
         const password = rawPassword || "1234";
         accounts.push({ username, employeeName, role, status, password });
       }
-      saveAccounts();
+      await saveAccounts();
       renderAccounts();
       refreshActiveAccountSelect();
       accountPasswordInput.value = "";
@@ -1626,7 +1654,7 @@
     showLoginPage();
   }
 
-  // ===== JSON Export/Import =====
+  // ===== JSON Export/Import (works with Firestore-backed arrays) =====
   function initExportJson() {
     const btn = document.getElementById("btn-export-json");
     if (!btn) return;
@@ -1649,6 +1677,7 @@
         handovers,
         users,
         accounts: accountsExport,
+        deletedHandovers,
       };
       const blob = new Blob([JSON.stringify(data, null, 2)], {
         type: "application/json",
@@ -1701,7 +1730,7 @@
         }
 
         const ok = confirm(
-          "This will replace all current data (handovers, users, accounts) in this browser with the data from the file.\nDo you want to continue?"
+          "This will replace all current data (handovers, users, accounts) in the database with the data from the file.\nDo you want to continue?"
         );
         if (!ok) {
           input.value = "";
@@ -1711,15 +1740,17 @@
         handovers = data.handovers;
         users = data.users;
         accounts = data.accounts;
+        deletedHandovers = data.deletedHandovers || [];
         normalizeAccountsPasswords();
 
-        saveHandovers();
-        saveUsers();
-        saveAccounts();
+        await saveHandovers();
+        await saveUsers();
+        await saveAccounts();
+        await saveDeletedHandovers();
 
         filteredHandovers = getVisibleHandovers();
 
-        renderUsers();
+        renderUsersTable();
         refreshUserSelectOptions();
         renderTable();
         renderAccounts();
@@ -1784,16 +1815,17 @@
       btnExcel.addEventListener("click", exportHandoverExcel);
     }
 
-    loadUsers();
-    loadHandovers();
-    await loadAccounts();          // wait for Firestore accounts
+    // Load everything from Firestore first
+    await loadUsers();
+    await loadHandovers();
+    await loadDeletedHandovers();
+    await loadAccounts();
     loadActiveAccount();
-    loadDeletedHandovers();
 
     initSidebarNavigation();
     initUserForm();
     initUserModal();
-    renderUsers();
+    renderUsersTable();
 
     initHandoverModal();
     initAccountModal();
@@ -1805,7 +1837,11 @@
     refreshActiveAccountSelect();
     initLogout();
 
-    initLogin();
+    filteredHandovers = getVisibleHandovers();
+    renderTable();
     renderDeletedHandovers();
+    renderReports();
+
+    initLogin();
   });
 </script>
