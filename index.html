@@ -688,9 +688,15 @@
       <div class="table-card">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h6 class="mb-0">User Accounts</h6>
-          <button class="btn btn-sm btn-primary" id="btn-add-account">
-            <i class="bi bi-plus-lg"></i> Add Account
-          </button>
+          <div class="d-flex gap-2">
+            <!-- زر جديد لإعادة تسلسل HNDR IDs -->
+            <button class="btn btn-sm btn-outline-warning" id="btn-resequence-ids" title="Resequence all HNDR IDs from 0001 by date">
+              <i class="bi bi-arrow-clockwise"></i> Resequence HNDR IDs
+            </button>
+            <button class="btn btn-sm btn-primary" id="btn-add-account">
+              <i class="bi bi-plus-lg"></i> Add Account
+            </button>
+          </div>
         </div>
         <div class="table-responsive">
           <table class="table table-sm align-middle">
@@ -2538,6 +2544,35 @@
     accountModal.show();
   }
 
+  // ===== زر إعادة التسلسل اليدوي (Admin فقط) =====
+  function initResequenceButton() {
+    const btn = document.getElementById("btn-resequence-ids");
+    if (!btn) return;
+
+    btn.addEventListener("click", () => {
+      const acc = getLoggedInAccount();
+      if (!acc || acc.role !== "Admin") {
+        alert("Only Admin can resequence HNDR IDs.");
+        return;
+      }
+
+      const ok = confirm(
+        "This will resequence ALL HNDR IDs starting from 0001 based on date (including deleted handovers).\nDo you want to continue?"
+      );
+      if (!ok) return;
+
+      resequenceAllHandoverIdsFromOne();
+      saveHandovers();
+      saveDeletedHandovers();
+
+      filteredHandovers = getVisibleHandovers();
+      renderTable();
+      renderDeletedHandovers();
+
+      alert("HNDR IDs resequenced successfully.");
+    });
+  }
+
   // ===== Login Handling =====
   function validateLogin(username, password) {
     normalizeAccountsPasswords();
@@ -2808,7 +2843,7 @@
     loadHandovers();
     loadDeletedHandovers();
 
-    // هنا يتم إعادة تسلسل كل المهام الحالية لتبدأ من 1 حسب التاريخ
+    // هنا يتم إعادة تسلسل كل المهام الحالية لتبدأ من 1 حسب التاريخ عند تشغيل النظام
     resequenceAllHandoverIdsFromOne();
     saveHandovers();
     saveDeletedHandovers();
@@ -2830,6 +2865,7 @@
     initImportJson();
     refreshActiveAccountSelect();
     initLogout();
+    initResequenceButton(); // تهيئة زر إعادة التسلسل اليدوي
 
     initLogin();
     renderDeletedHandovers();
