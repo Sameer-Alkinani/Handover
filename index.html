@@ -1036,7 +1036,7 @@
 <script>
   const MAX_ATTACHMENT_SIZE = 3 * 1024 * 1024; // ~3MB
 
-  // NEW: key for HNDR ID counters in localStorage
+  // NEW: key for HNDR ID counters in localStorage (global serial)
   const ID_COUNTER_STORAGE_KEY = "warehouseLastHndrIdMap";
 
   // NEW: load global last serial from localStorage
@@ -1074,7 +1074,7 @@
   }
 
   // NEW: normalize IDs in a list to HNDR-YY-MM-XXXX based on date
-  // مع إعادة تسلسل كل المهام في القائمة وتسلسل واحد مستمر حتى لو اختلف الشهر
+  // مع تسلسل واحد مستمر حتى لو اختلف الشهر
   function normalizeIdsForList(list, lastSerial) {
     if (!Array.isArray(list) || list.length === 0) return lastSerial;
 
@@ -1109,16 +1109,17 @@
     { name: "Ardasher A. Ahmad",   role: "Supervisor", email: "" },
   ];
 
+  // تم ضبط التاريخ على شهر 09/2025 ليبدأ التسلسل من HNDR-25-09-0001
   const defaultHandovers = [
     {
-      id: "HNDR-001",
+      id: "HNDR-25-09-0001",
       from: "Sameer Jabbar",
       to: "Ardasher A. Ahmad",
       items: "120 cartons of Product A",
       longDescription: "",
       priority: "P1",
       status: "Pending",
-      date: "2025-11-20",
+      date: "2025-09-20",
       actionBy: "Sameer Jabbar",
       attachmentName: null,
       attachmentType: null,
@@ -1126,14 +1127,14 @@
       attachmentDataUrl: null,
     },
     {
-      id: "HNDR-002",
+      id: "HNDR-25-09-0002",
       from: "Ardasher A. Ahmad",
       to: "Sameer Jabbar",
       items: "80 pallets of Product B",
       longDescription: "",
       priority: "P2",
       status: "In Progress",
-      date: "2025-11-21",
+      date: "2025-09-21",
       actionBy: "Ardasher A. Ahmad",
       attachmentName: null,
       attachmentType: null,
@@ -1359,7 +1360,7 @@
 
     const serial = String(lastSerial).padStart(4, "0"); // 1 → "0001"
 
-    // Final format: HNDR-25-12-0001
+    // Final format: HNDR-25-10-0003 مثلاً
     return `HNDR-${year}-${month}-${serial}`;
   }
 
@@ -1526,7 +1527,7 @@
     });
 
     if (countEl) {
-      countEl.textContent = completed.length + " records";
+      countEl.textContent = completed.length + "records";
     }
   }
 
