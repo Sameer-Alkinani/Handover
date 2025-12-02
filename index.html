@@ -20,6 +20,9 @@
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
+  <!-- XLSX for Excel export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
   <style>
     :root {
       --primary-color: #145da0;
@@ -33,6 +36,25 @@
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
+    /* ===== Login Page ===== */
+    #login-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-color);
+      padding: 1rem;
+    }
+
+    .login-card {
+      max-width: 420px;
+      width: 100%;
+      border-radius: 1rem;
+      border: 1px solid #e1e4eb;
+      background: #fff;
+    }
+
+    /* ===== App Shell ===== */
     .app-shell {
       min-height: 100vh;
       display: flex;
@@ -153,13 +175,13 @@
 
     .filters-grid {
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 0.75rem;
+      align-items: end;
     }
 
     .table-responsive {
       margin-top: 0.75rem;
-      max-height: 420px;
       overflow: auto;
     }
 
@@ -207,17 +229,19 @@
       color: #1d4ed8;
     }
 
-    /* Allow manual resize of the Handover List card (only height) */
     .table-card--resizable {
       resize: vertical;
-      overflow: auto;
+      overflow: hidden;
       min-height: 220px;
       max-height: 80vh;
+      display: flex;
+      flex-direction: column;
     }
 
-    /* Reports page tuning */
-    .chart-card canvas {
-      max-height: 260px;
+    .table-card--resizable .table-responsive {
+      flex: 1 1 auto;
+      max-height: none;
+      overflow-y: auto;
     }
 
     @media (max-width: 992px) {
@@ -250,10 +274,6 @@
       .filters-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
-
-      .chart-card {
-        padding: 0.75rem 0.85rem;
-      }
     }
 
     @media (max-width: 576px) {
@@ -268,7 +288,32 @@
   </style>
 </head>
 <body>
-<div class="app-shell">
+
+<!-- ===== Login Page ===== -->
+<div id="login-page">
+  <div class="login-card shadow-sm p-4">
+    <h4 class="mb-3 text-center">Warehouse Handover Login</h4>
+    <form id="login-form">
+      <div class="mb-3">
+        <label class="form-label">Username</label>
+        <input type="text" id="login-username" class="form-control" autocomplete="username" required />
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Password</label>
+        <input type="password" id="login-password" class="form-control" autocomplete="current-password" required />
+      </div>
+      <div id="login-error" class="text-danger small mb-2" style="display:none;"></div>
+      <button type="submit" class="btn btn-primary w-100">Login</button>
+    </form>
+    <div class="mt-3 text-muted small text-center">
+      Use a username from <strong>Users (Admin)</strong>.<br/>
+      Password is set by the <strong>Admin</strong> for each account (initial default is <strong>1234</strong> for new accounts).
+    </div>
+  </div>
+</div>
+
+<!-- ===== App Shell ===== -->
+<div id="app-shell" class="app-shell" style="display:none;">
   <!-- Sidebar -->
   <aside class="sidebar">
     <div>
@@ -305,7 +350,11 @@
       </nav>
     </div>
     <div class="sidebar-footer">
-      v1.0 – No login required
+      <div class="mb-2 small" id="current-user-label"></div>
+      <button class="btn btn-sm btn-outline-light w-100 mb-2" id="btn-logout">
+        <i class="bi bi-box-arrow-right"></i> Logout
+      </button>
+      <div style="font-size:0.75rem;color:#9fb3ff;">v1.3 – Role-based access</div>
     </div>
   </aside>
 
@@ -322,12 +371,15 @@
           </div>
         </div>
         <div class="d-flex align-items-center gap-2">
-          <!-- زر إكسل بدل التاريخ و Today -->
-          <button class="btn btn-sm btn-outline-secondary" id="btn-export-excel">
-            <i class="bi bi-file-earmark-excel"></i> Export Excel
-          </button>
+          <div class="d-flex align-items-center gap-1">
+            <span style="font-size:0.8rem;color:#6b7280;">User:</span>
+            <select id="active-account-select" class="form-select form-select-sm" style="width: 180px;"></select>
+          </div>
           <button class="btn btn-sm btn-primary" id="btn-add-handover">
             <i class="bi bi-plus-lg"></i> New Handover
+          </button>
+          <button class="btn btn-sm btn-success" id="btn-export-excel">
+            <i class="bi bi-file-earmark-excel"></i> Export Excel
           </button>
         </div>
       </div>
@@ -426,6 +478,14 @@
             />
           </div>
           <div>
+            <label class="form-label form-label-sm">Date To</label>
+            <input
+              type="date"
+              id="filter-date-to"
+              class="form-control form-control-sm"
+            />
+          </div>
+          <div>
             <label class="form-label form-label-sm">Search</label>
             <input
               type="text"
@@ -437,9 +497,9 @@
         </div>
       </section>
 
-      <!-- Table (list only – chart moved to Reports) -->
+      <!-- Table -->
       <div class="row mt-2 g-3">
-        <div class="col-lg-8">
+        <div class="col-12">
           <section class="table-card table-card--resizable">
             <div class="d-flex justify-content-between align-items-center mb-2">
               <h6 class="mb-0">Handover List</h6>
@@ -465,7 +525,6 @@
                 </tr>
                 </thead>
                 <tbody id="handover-tbody">
-                <!-- Rows rendered by JS -->
                 </tbody>
               </table>
             </div>
@@ -474,7 +533,7 @@
       </div>
     </section>
 
-    <!-- HANDOVERS VIEW: COMPLETED ONLY -->
+    <!-- HANDOVERS VIEW -->
     <section class="view-section d-none" data-view="handovers">
       <div class="top-bar mb-3">
         <div>
@@ -510,7 +569,6 @@
             </tr>
             </thead>
             <tbody id="completed-tbody">
-            <!-- completed rows -->
             </tbody>
           </table>
         </div>
@@ -565,7 +623,6 @@
             </tr>
             </thead>
             <tbody id="users-tbody">
-            <!-- users rows -->
             </tbody>
           </table>
         </div>
@@ -579,7 +636,7 @@
           <div class="top-bar-title">Users (Admin)</div>
           <div style="font-size: 0.85rem; color: #6b7280">
             Manage application accounts (username, role, and link to employees).  
-            No real passwords here yet – prototype only.
+            Passwords are local to this browser only.
           </div>
         </div>
       </div>
@@ -600,11 +657,10 @@
               <th>Employee</th>
               <th>Role</th>
               <th>Status</th>
-              <th style="width: 70px;">Actions</th>
+              <th style="width: 100px;">Actions</th>
             </tr>
             </thead>
             <tbody id="accounts-tbody">
-            <!-- account rows -->
             </tbody>
           </table>
         </div>
@@ -640,25 +696,25 @@
 
       <!-- KPIs -->
       <div class="row g-3 mb-3">
-        <div class="col-lg-3 col-md-6">
+        <div class="col-md-3">
           <div class="stat-card">
             <span class="stat-label">Total Handovers</span>
             <div class="stat-value" id="rep-total">0</div>
           </div>
         </div>
-        <div class="col-lg-3 col-md-6">
+        <div class="col-md-3">
           <div class="stat-card">
             <span class="stat-label">Completed</span>
             <div class="stat-value text-success" id="rep-completed">0</div>
           </div>
         </div>
-        <div class="col-lg-3 col-md-6">
+        <div class="col-md-3">
           <div class="stat-card">
             <span class="stat-label">Pending</span>
             <div class="stat-value text-warning" id="rep-pending">0</div>
           </div>
         </div>
-        <div class="col-lg-3 col-md-6">
+        <div class="col-md-3">
           <div class="stat-card">
             <span class="stat-label">Delayed</span>
             <div class="stat-value text-danger" id="rep-delayed">0</div>
@@ -670,29 +726,16 @@
       <div class="row g-3">
         <div class="col-lg-6">
           <div class="chart-card">
-            <h6>Status Distribution</h6>
-            <p class="text-muted mb-2">Handovers by current status.</p>
+            <h6>By Status (Visible Handovers)</h6>
+            <p class="text-muted mb-2">For Admin/Supervisor: all handovers. For others: only own / assigned handovers.</p>
             <canvas id="reports-status-chart" height="220"></canvas>
           </div>
         </div>
         <div class="col-lg-6">
           <div class="chart-card">
             <h6>Handovers by User</h6>
-            <p class="text-muted mb-2">Number of handovers per Action By.</p>
+            <p class="text-muted mb-2">Number of handovers per Action By (within visibility rules).</p>
             <canvas id="reports-user-chart" height="220"></canvas>
-          </div>
-        </div>
-      </div>
-
-      <!-- By Status bar chart (all data) -->
-      <div class="row g-3 mt-3">
-        <div class="col-12">
-          <div class="chart-card">
-            <h6>By Status</h6>
-            <p class="text-muted mb-2">
-              Overall handovers by status (all records).
-            </p>
-            <canvas id="status-chart" height="220"></canvas>
           </div>
         </div>
       </div>
@@ -805,7 +848,7 @@
           >
             Cancel
           </button>
-          <button type="submit" class="btn btn-primary">
+          <button type="submit" class="btn btn-primary" id="handover-save-btn">
             Save
           </button>
         </div>
@@ -814,7 +857,7 @@
   </div>
 </div>
 
-<!-- Modal: Edit User -->
+<!-- Modal: Edit User (employee) -->
 <div
   class="modal fade"
   id="user-modal"
@@ -909,9 +952,21 @@
               <option value="Disabled">Disabled</option>
             </select>
           </div>
+          <div class="mb-2">
+            <label class="form-label">Password (Admin only)</label>
+            <input
+              type="password"
+              id="account-password"
+              class="form-control"
+              placeholder="Leave blank to keep current password"
+            />
+            <div class="form-text">
+              Only Admin can set or change passwords for user accounts.
+            </div>
+          </div>
           <div class="alert alert-warning mt-2 mb-0" style="font-size:0.8rem;">
-            Passwords are not stored in this prototype.  
-            This page is only to design and plan user accounts.
+            Passwords are stored only in this browser (prototype).  
+            Exported JSON does not include passwords for safety.
           </div>
         </div>
         <div class="modal-footer">
@@ -937,7 +992,6 @@
 <script>
   const MAX_ATTACHMENT_SIZE = 3 * 1024 * 1024; // ~3MB
 
-  // ===== Data & Storage =====
   const defaultUsers = [
     { name: "Sameer Jabbar",       role: "Manager",    email: "sameer_jabbar@yahoo.com" },
     { name: "Ardasher A. Ahmad",   role: "Supervisor", email: "" },
@@ -978,10 +1032,11 @@
 
   const defaultAccounts = [
     {
-      username: "admin",
+      username: "Admin",
       employeeName: "Sameer Jabbar",
       role: "Admin",
       status: "Active",
+      password: "1234",
     },
   ];
 
@@ -990,12 +1045,12 @@
   let users = [];
   let accounts = [];
 
-  let statusChart = null;
   let reportsStatusChart = null;
   let reportsUserChart = null;
 
   let isEditMode = false;
   let editingId = null;
+  let editingReadOnly = false;
 
   let editingUserIndex = null;
   let userModal, userEditForm, editUserNameInput, editUserRoleInput, editUserEmailInput;
@@ -1004,15 +1059,15 @@
   let handoverForm;
   let inputId, inputFrom, inputTo, inputItems, inputLongDesc, inputPriority,
       inputStatus, inputDate, inputActionBy,
-      attachmentInput, currentAttachmentInfo, modalTitleEl;
+      attachmentInput, currentAttachmentInfo, modalTitleEl, handoverSaveBtn;
 
-  // admin accounts modal
   let accountModal, accountForm;
-  let accountUsernameInput, accountEmployeeSelect, accountRoleSelect, accountStatusSelect;
+  let accountUsernameInput, accountEmployeeSelect, accountRoleSelect, accountStatusSelect, accountPasswordInput;
   let isEditAccount = false;
   let editingAccountIndex = null;
 
-  // ===== LocalStorage helpers =====
+  let activeAccountUsername = null;
+
   function loadUsers() {
     const saved = localStorage.getItem("warehouseUsers");
     if (saved) {
@@ -1048,6 +1103,14 @@
     localStorage.setItem("warehouseHandovers", JSON.stringify(handovers));
   }
 
+  function normalizeAccountsPasswords() {
+    accounts.forEach(acc => {
+      if (typeof acc.password === "undefined" || acc.password === null) {
+        acc.password = "1234";
+      }
+    });
+  }
+
   function loadAccounts() {
     const saved = localStorage.getItem("warehouseAccounts");
     if (saved) {
@@ -1059,16 +1122,87 @@
     } else {
       accounts = [...defaultAccounts];
     }
+    normalizeAccountsPasswords();
   }
 
   function saveAccounts() {
+    normalizeAccountsPasswords();
     localStorage.setItem("warehouseAccounts", JSON.stringify(accounts));
+  }
+
+  function loadActiveAccount() {
+    activeAccountUsername = localStorage.getItem("warehouseActiveAccountUsername") || "";
+  }
+
+  function saveActiveAccount() {
+    if (activeAccountUsername) {
+      localStorage.setItem("warehouseActiveAccountUsername", activeAccountUsername);
+    } else {
+      localStorage.removeItem("warehouseActiveAccountUsername");
+    }
+  }
+
+  function getLoggedInUsername() {
+    return localStorage.getItem("warehouseLoggedInAccountUsername") || "";
+  }
+
+  function setLoggedInUsername(username) {
+    if (username) {
+      localStorage.setItem("warehouseLoggedInAccountUsername", username);
+    } else {
+      localStorage.removeItem("warehouseLoggedInAccountUsername");
+    }
+  }
+
+  function getActiveAccount() {
+    if (!activeAccountUsername) return null;
+    return accounts.find(acc => acc.username === activeAccountUsername) || null;
+  }
+
+  function getLoggedInAccount() {
+    const username = getLoggedInUsername();
+    if (!username) return null;
+    return accounts.find(acc => acc.username === username) || null;
+  }
+
+  // ===== Visibility rules =====
+  function getVisibleHandovers() {
+    const acc = getLoggedInAccount();
+    if (!acc) return [];
+
+    if (acc.role === "Admin" || acc.role === "Supervisor") {
+      return handovers;
+    }
+
+    const empName = acc.employeeName?.trim() || "";
+    if (!empName) return [];
+
+    return handovers.filter(h => {
+      const actionByName = (h.actionBy || "").trim();
+      const toName = (h.to || "").trim();
+      return actionByName === empName || toName === empName;
+    });
+  }
+
+  // User can edit if he is actionBy OR To (besides admin/supervisor)
+  function canEditHandover(h) {
+    const acc = getLoggedInAccount();
+    if (!acc) return false;
+    if (acc.role === "Admin" || acc.role === "Supervisor") return true;
+
+    const empName = acc.employeeName || "";
+    if (!empName) return false;
+
+    if (acc.role === "User") {
+      return h.actionBy === empName || h.to === empName;
+    }
+    return false; // Viewer
   }
 
   function generateNextId() {
     if (handovers.length === 0) return "HNDR-001";
     let maxNum = 0;
-    handovers.forEach((h) => {
+    handovers.forEach(h => {
       const parts = String(h.id).split("-");
       const num = parseInt(parts[1] || "0", 10);
       if (!isNaN(num) && num > maxNum) maxNum = num;
@@ -1092,13 +1226,33 @@
     }
   }
 
-  // ===== Dashboard table =====
+  // ===== Table Rendering =====
   function renderTable() {
     const tbody = document.getElementById("handover-tbody");
     tbody.innerHTML = "";
 
-    filteredHandovers.forEach((h) => {
+    const acc = getLoggedInAccount();
+    const empName = acc?.employeeName?.trim() || "";
+
+    filteredHandovers.forEach(h => {
       const linkUrl = h.attachmentDataUrl || h.attachmentUrl || null;
+      const canEdit = canEditHandover(h);
+
+      const isAssignedToUser = empName && h.actionBy === empName;
+
+      let actionsHtml = `
+        <button class="btn btn-sm btn-outline-secondary btn-view" data-id="${h.id}" title="View${canEdit ? ' / Edit' : ''}">
+          <i class="bi bi-eye"></i>
+        </button>
+      `;
+      if (canEdit) {
+        actionsHtml += `
+          <button class="btn btn-sm btn-outline-success btn-complete" data-id="${h.id}" title="Mark as Completed">
+            <i class="bi bi-check2"></i>
+          </button>
+        `;
+      }
+
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td><span class="fw-semibold">${h.id}</span></td>
@@ -1108,7 +1262,14 @@
         <td>${h.priority || "-"}</td>
         <td><span class="${getStatusClass(h.status)}">${h.status}</span></td>
         <td>${h.date}</td>
-        <td>${h.actionBy || ""}</td>
+        <td>
+          ${h.actionBy || ""}
+          ${
+            isAssignedToUser
+              ? `<span class="badge bg-primary-subtle text-primary ms-1" title="Task assigned to you">Assigned to you</span>`
+              : ""
+          }
+        </td>
         <td>
           ${
             linkUrl
@@ -1122,14 +1283,7 @@
               : `<span class="text-muted" style="font-size:0.8rem;">None</span>`
           }
         </td>
-        <td>
-          <button class="btn btn-sm btn-outline-secondary btn-view" data-id="${h.id}" title="View / Edit">
-            <i class="bi bi-eye"></i>
-          </button>
-          <button class="btn btn-sm btn-outline-success btn-complete" data-id="${h.id}" title="Mark as Completed">
-            <i class="bi bi-check2"></i>
-          </button>
-        </td>
+        <td>${actionsHtml}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -1140,7 +1294,6 @@
     renderCompletedTable();
     attachRowActions();
     updateStats();
-    renderChart();
     renderReports();
   }
 
@@ -1150,10 +1303,15 @@
     if (!tbody) return;
 
     tbody.innerHTML = "";
-    const completed = handovers.filter((h) => h.status === "Completed");
+    const base = getVisibleHandovers();
+    const completed = base.filter(h => h.status === "Completed");
 
-    completed.forEach((h) => {
+    const acc = getLoggedInAccount();
+    const empName = acc?.employeeName?.trim() || "";
+
+    completed.forEach(h => {
       const linkUrl = h.attachmentDataUrl || h.attachmentUrl || null;
+      const isAssignedToUser = empName && h.actionBy === empName;
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td><span class="fw-semibold">${h.id}</span></td>
@@ -1163,7 +1321,14 @@
         <td>${h.priority || "-"}</td>
         <td><span class="${getStatusClass(h.status)}">${h.status}</span></td>
         <td>${h.date}</td>
-        <td>${h.actionBy || ""}</td>
+        <td>
+          ${h.actionBy || ""}
+          ${
+            isAssignedToUser
+              ? `<span class="badge bg-primary-subtle text-primary ms-1" title="Task assigned to you">Assigned to you</span>`
+              : ""
+          }
+        </td>
         <td>
           ${
             linkUrl
@@ -1192,18 +1357,22 @@
   }
 
   function attachRowActions() {
-    document.querySelectorAll(".btn-view").forEach((btn) => {
+    document.querySelectorAll(".btn-view").forEach(btn => {
       btn.addEventListener("click", () => {
         const id = btn.getAttribute("data-id");
         openEditHandover(id);
       });
     });
 
-    document.querySelectorAll(".btn-complete").forEach((btn) => {
+    document.querySelectorAll(".btn-complete").forEach(btn => {
       btn.addEventListener("click", () => {
         const id = btn.getAttribute("data-id");
-        const h = handovers.find((x) => x.id === id);
+        const h = handovers.find(x => x.id === id);
         if (!h) return;
+        if (!canEditHandover(h)) {
+          alert("You are not allowed to update this handover.");
+          return;
+        }
         h.status = "Completed";
         saveHandovers();
         applyFilters();
@@ -1217,18 +1386,23 @@
     const status = document.getElementById("filter-status").value;
     const priority = document.getElementById("filter-priority").value;
     const dateFrom = document.getElementById("filter-date-from").value;
+    const dateTo = document.getElementById("filter-date-to").value;
     const search = document
       .getElementById("filter-search")
       .value.toLowerCase();
 
-    filteredHandovers = handovers.filter((h) => {
+    const base = getVisibleHandovers();
+
+    filteredHandovers = base.filter(h => {
       let ok = true;
 
       if (from && h.from !== from) ok = false;
       if (to && h.to !== to) ok = false;
       if (status && h.status !== status) ok = false;
       if (priority && h.priority !== priority) ok = false;
+
       if (dateFrom && h.date < dateFrom) ok = false;
+      if (dateTo && h.date > dateTo) ok = false;
 
       if (search) {
         const text =
@@ -1248,16 +1422,17 @@
     document.getElementById("filter-status").value = "";
     document.getElementById("filter-priority").value = "";
     document.getElementById("filter-date-from").value = "";
+    document.getElementById("filter-date-to").value = "";
     document.getElementById("filter-search").value = "";
-    filteredHandovers = [...handovers];
+    filteredHandovers = getVisibleHandovers();
     renderTable();
   }
 
   function updateStats() {
     const total = filteredHandovers.length;
-    const pending = filteredHandovers.filter((h) => h.status === "Pending").length;
-    const completed = filteredHandovers.filter((h) => h.status === "Completed").length;
-    const delayed = filteredHandovers.filter((h) => h.status === "Delayed").length;
+    const pending = filteredHandovers.filter(h => h.status === "Pending").length;
+    const completed = filteredHandovers.filter(h => h.status === "Completed").length;
+    const delayed = filteredHandovers.filter(h => h.status === "Delayed").length;
 
     document.getElementById("stat-total").textContent = total;
     document.getElementById("stat-pending").textContent = pending;
@@ -1265,22 +1440,30 @@
     document.getElementById("stat-delayed").textContent = delayed;
   }
 
-  // ✅ By Status chart now uses ALL handovers (not filtered)
-  function renderChart() {
-    const canvas = document.getElementById("status-chart");
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+  // ===== Reports =====
+  function renderReports() {
+    const base = getVisibleHandovers();
 
-    const pending = handovers.filter((h) => h.status === "Pending").length;
-    const inProgress = handovers.filter((h) => h.status === "In Progress").length;
-    const completed = handovers.filter((h) => h.status === "Completed").length;
-    const delayed = handovers.filter((h) => h.status === "Delayed").length;
+    const total = base.length;
+    const pending = base.filter(h => h.status === "Pending").length;
+    const completed = base.filter(h => h.status === "Completed").length;
+    const delayed = base.filter(h => h.status === "Delayed").length;
+    const inProgress = base.filter(h => h.status === "In Progress").length;
 
-    if (statusChart) {
-      statusChart.destroy();
-    }
+    const repTotal = document.getElementById("rep-total");
+    if (!repTotal) return;
 
-    statusChart = new Chart(ctx, {
+    document.getElementById("rep-total").textContent = total;
+    document.getElementById("rep-pending").textContent = pending;
+    document.getElementById("rep-completed").textContent = completed;
+    document.getElementById("rep-delayed").textContent = delayed;
+
+    const statusCanvas = document.getElementById("reports-status-chart");
+    const userCanvas = document.getElementById("reports-user-chart");
+    if (!statusCanvas || !userCanvas) return;
+
+    if (reportsStatusChart) reportsStatusChart.destroy();
+    reportsStatusChart = new Chart(statusCanvas.getContext("2d"), {
       type: "bar",
       data: {
         labels: ["Pending", "In Progress", "Completed", "Delayed"],
@@ -1298,63 +1481,18 @@
         },
         scales: {
           x: {
-            ticks: {
-              font: { size: 11 },
-            },
+            ticks: { font: { size: 11 } },
           },
           y: {
             beginAtZero: true,
-            ticks: {
-              stepSize: 1,
-            },
+            ticks: { stepSize: 1 },
           },
-        },
-      },
-    });
-  }
-
-  // ===== Reports =====
-  function renderReports() {
-    const total = handovers.length;
-    const pending = handovers.filter(h => h.status === "Pending").length;
-    const completed = handovers.filter(h => h.status === "Completed").length;
-    const delayed = handovers.filter(h => h.status === "Delayed").length;
-
-    const repTotal = document.getElementById("rep-total");
-    if (!repTotal) return;
-
-    document.getElementById("rep-total").textContent = total;
-    document.getElementById("rep-pending").textContent = pending;
-    document.getElementById("rep-completed").textContent = completed;
-    document.getElementById("rep-delayed").textContent = delayed;
-
-    const ctxStatus = document.getElementById("reports-status-chart");
-    const ctxUser = document.getElementById("reports-user-chart");
-    if (!ctxStatus || !ctxUser) return;
-
-    const inProgress = handovers.filter(h => h.status === "In Progress").length;
-
-    if (reportsStatusChart) reportsStatusChart.destroy();
-    reportsStatusChart = new Chart(ctxStatus.getContext("2d"), {
-      type: "pie",
-      data: {
-        labels: ["Pending", "In Progress", "Completed", "Delayed"],
-        datasets: [
-          {
-            data: [pending, inProgress, completed, delayed],
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { position: "bottom" },
         },
       },
     });
 
     const byUser = {};
-    handovers.forEach(h => {
+    base.forEach(h => {
       const key = h.actionBy || "Unknown";
       byUser[key] = (byUser[key] || 0) + 1;
     });
@@ -1363,7 +1501,7 @@
     const userData = Object.values(byUser);
 
     if (reportsUserChart) reportsUserChart.destroy();
-    reportsUserChart = new Chart(ctxUser.getContext("2d"), {
+    reportsUserChart = new Chart(userCanvas.getContext("2d"), {
       type: "bar",
       data: {
         labels: userLabels,
@@ -1392,6 +1530,83 @@
     });
   }
 
+  // ===== Excel Export =====
+  function exportHandoverExcel() {
+    const source =
+      filteredHandovers && filteredHandovers.length > 0
+        ? filteredHandovers
+        : getVisibleHandovers();
+
+    const data = source.map(h => ({
+      "HNDR ID": h.id,
+      "From": h.from,
+      "To": h.to,
+      "Items": h.items,
+      "Long Description": h.longDescription || "",
+      "Priority": h.priority || "",
+      "Status": h.status || "",
+      "Date": h.date || "",
+      "Action By": h.actionBy || "",
+      "Attachment Name": h.attachmentName || "None",
+      "Attachment Link": h.attachmentDataUrl || h.attachmentUrl || "",
+    }));
+
+    if (data.length === 0) {
+      alert("No records to export.");
+      return;
+    }
+
+    if (typeof XLSX === "undefined") {
+      alert("XLSX library is not loaded. Please check the script include.");
+      return;
+    }
+
+    const ws = XLSX.utils.json_to_sheet(data);
+
+    if (ws["!ref"]) {
+      const range = XLSX.utils.decode_range(ws["!ref"]);
+      let linkColIndex = null;
+      let nameColIndex = null;
+
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const headerAddress = XLSX.utils.encode_cell({ c: C, r: 0 });
+        const headerCell = ws[headerAddress];
+        if (!headerCell) continue;
+        if (headerCell.v === "Attachment Link") linkColIndex = C;
+        if (headerCell.v === "Attachment Name") nameColIndex = C;
+      }
+
+      if (linkColIndex !== null) {
+        for (let R = 1; R <= range.e.r; ++R) {
+          const linkAddress = XLSX.utils.encode_cell({ c: linkColIndex, r: R });
+          const cell = ws[linkAddress];
+          if (cell && cell.v) {
+            const url = cell.v;
+
+            let displayText = "Open Attachment";
+            if (nameColIndex !== null) {
+              const nameAddress = XLSX.utils.encode_cell({ c: nameColIndex, r: R });
+              const nameCell = ws[nameAddress];
+              if (nameCell && nameCell.v && nameCell.v !== "None") {
+                displayText = nameCell.v;
+              }
+            }
+
+            cell.l = {
+              Target: url,
+              Tooltip: "Open attachment in browser",
+            };
+            cell.v = displayText;
+          }
+        }
+      }
+    }
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Handover List");
+    XLSX.writeFile(wb, "Handover_List.xlsx");
+  }
+
   function readFileAsDataUrl(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -1402,4 +1617,937 @@
   }
 
   function setSelectOptions(select, values, includeEmpty, emptyLabel) {
-    const current = select.value
+    const current = select.value;
+    select.innerHTML = "";
+    if (includeEmpty) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = emptyLabel || "All";
+      select.appendChild(opt);
+    }
+    values.forEach(v => {
+      const opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = v;
+      select.appendChild(opt);
+    });
+    if (current && values.includes(current)) {
+      select.value = current;
+    }
+  }
+
+  function refreshUserSelectOptions() {
+    const names = users.map(u => u.name);
+
+    const filterFrom = document.getElementById("filter-from");
+    const filterTo = document.getElementById("filter-to");
+    setSelectOptions(filterFrom, names, true, "All");
+    setSelectOptions(filterTo, names, true, "All");
+
+    if (inputTo && inputActionBy) {
+      setSelectOptions(inputTo, names, false);
+      setSelectOptions(inputActionBy, names, false);
+    }
+
+    fillAccountEmployeeOptions();
+  }
+
+  // === Restrict From (new handover) to logged-in employee ===
+  function setupFromForNewHandover() {
+    if (!inputFrom) return;
+
+    const acc = getLoggedInAccount();
+    const linkedName = acc?.employeeName?.trim();
+
+    inputFrom.innerHTML = "";
+
+    if (linkedName) {
+      const opt = document.createElement("option");
+      opt.value = linkedName;
+      opt.textContent = linkedName;
+      inputFrom.appendChild(opt);
+      inputFrom.value = linkedName;
+    } else {
+      const names = users.map(u => u.name);
+      setSelectOptions(inputFrom, names, false);
+      if (names.length > 0) {
+        inputFrom.value = names[0];
+      }
+    }
+
+    inputFrom.setAttribute("disabled", "disabled");
+  }
+
+  function refreshActiveAccountSelect() {
+    const select = document.getElementById("active-account-select");
+    if (!select) return;
+
+    const currentValue = activeAccountUsername || "";
+
+    select.innerHTML = "";
+    const optGuest = document.createElement("option");
+    optGuest.value = "";
+    optGuest.textContent = "Guest (no login)";
+    select.appendChild(optGuest);
+
+    accounts.forEach(acc => {
+      const opt = document.createElement("option");
+      opt.value = acc.username;
+      opt.textContent = `${acc.username} (${acc.role || "User"})`;
+      select.appendChild(opt);
+    });
+
+    select.value = currentValue;
+
+    select.onchange = () => {
+      activeAccountUsername = select.value || "";
+      saveActiveAccount();
+    };
+  }
+
+  // From always disabled (read-only)
+  function setHandoverFormReadOnly(readOnly) {
+    const fields = [
+      inputTo,
+      inputItems,
+      inputLongDesc,
+      inputPriority,
+      inputStatus,
+      inputDate,
+      inputActionBy,
+      attachmentInput,
+    ];
+    fields.forEach(el => {
+      if (!el) return;
+      if (readOnly) {
+        el.setAttribute("disabled", "disabled");
+      } else {
+        el.removeAttribute("disabled");
+      }
+    });
+
+    if (inputFrom) {
+      inputFrom.setAttribute("disabled", "disabled");
+    }
+
+    if (handoverSaveBtn) {
+      handoverSaveBtn.style.display = readOnly ? "none" : "inline-block";
+    }
+  }
+
+  function initHandoverModal() {
+    const modalEl = document.getElementById("handover-modal");
+    handoverModal = new bootstrap.Modal(modalEl);
+    handoverForm = document.getElementById("handover-form");
+    modalTitleEl = document.getElementById("handover-modal-title");
+
+    inputId = document.getElementById("handover-id");
+    inputFrom = document.getElementById("handover-from");
+    inputTo = document.getElementById("handover-to");
+    inputItems = document.getElementById("handover-items");
+    inputLongDesc = document.getElementById("handover-long-desc");
+    inputPriority = document.getElementById("handover-priority");
+    inputStatus = document.getElementById("handover-status");
+    inputDate = document.getElementById("handover-date");
+    inputActionBy = document.getElementById("handover-action-by");
+    attachmentInput = document.getElementById("handover-attachment");
+    currentAttachmentInfo = document.getElementById("current-attachment-info");
+    handoverSaveBtn = document.getElementById("handover-save-btn");
+
+    refreshUserSelectOptions();
+
+    const openButtons = [
+      document.getElementById("btn-add-handover"),
+      document.getElementById("btn-add-handover-2"),
+    ].filter(Boolean);
+
+    openButtons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const acc = getLoggedInAccount();
+        if (!acc) {
+          alert("You must be logged in to create a handover.");
+          return;
+        }
+        if (acc.status === "Disabled") {
+          alert("Your account is disabled.");
+          return;
+        }
+        if (acc.role === "Viewer") {
+          alert("Viewer accounts cannot create handovers.");
+          return;
+        }
+
+        isEditMode = false;
+        editingId = null;
+        editingReadOnly = false;
+        handoverForm.reset();
+        inputId.value = generateNextId();
+        inputDate.value = new Date().toISOString().slice(0, 10);
+        currentAttachmentInfo.textContent = "No attachment";
+        attachmentInput.value = "";
+        inputLongDesc.value = "";
+        inputPriority.value = "P3";
+
+        refreshUserSelectOptions();
+
+        setupFromForNewHandover();
+
+        if (users.length > 0) {
+          inputTo.value = users[0].name;
+        }
+
+        const loggedAcc = getLoggedInAccount();
+        if (loggedAcc && loggedAcc.employeeName) {
+          inputActionBy.value = loggedAcc.employeeName;
+        } else if (users.length > 0) {
+          inputActionBy.value = users[0].name;
+        }
+
+        setHandoverFormReadOnly(false);
+        modalTitleEl.textContent = "New Handover";
+        handoverModal.show();
+      });
+    });
+
+    handoverForm.addEventListener("submit", async e => {
+      e.preventDefault();
+
+      if (editingReadOnly) return;
+
+      const acc = getLoggedInAccount();
+      if (!acc) {
+        alert("You must be logged in to save.");
+        return;
+      }
+      if (acc.status === "Disabled") {
+        alert("Your account is disabled.");
+        return;
+      }
+      if (!isEditMode && acc.role === "Viewer") {
+        alert("Viewer accounts cannot create handovers.");
+        return;
+      }
+
+      const from = inputFrom.value;
+      const to = inputTo.value;
+      const items = inputItems.value;
+      const longDescription = inputLongDesc.value;
+      const priority = inputPriority.value;
+      const status = inputStatus.value;
+      const date = inputDate.value;
+      const actionBy = inputActionBy.value;
+      const file = attachmentInput.files[0] || null;
+
+      let attachmentName = null;
+      let attachmentType = null;
+      let attachmentSize = null;
+      let attachmentDataUrl = null;
+
+      if (isEditMode) {
+        const current = handovers.find(h => h.id === editingId);
+        if (current) {
+          if (!canEditHandover(current)) {
+            alert("You are not allowed to edit this handover.");
+            return;
+          }
+          attachmentName = current.attachmentName || null;
+          attachmentType = current.attachmentType || null;
+          attachmentSize = current.attachmentSize || null;
+          attachmentDataUrl = current.attachmentDataUrl || current.attachmentUrl || null;
+        }
+      }
+
+      if (file) {
+        if (file.size > MAX_ATTACHMENT_SIZE) {
+          alert("Attachment is too large to save in the browser (max ~3MB). Please attach a smaller file.");
+          return;
+        }
+        attachmentName = file.name;
+        attachmentType = file.type || null;
+        attachmentSize = file.size;
+        attachmentDataUrl = await readFileAsDataUrl(file);
+      }
+
+      if (isEditMode) {
+        const idx = handovers.findIndex(h => h.id === editingId);
+        if (idx === -1) return;
+        handovers[idx] = {
+          ...handovers[idx],
+          from,
+          to,
+          items,
+          longDescription,
+          priority,
+          status,
+          date,
+          actionBy,
+          attachmentName,
+          attachmentType,
+          attachmentSize,
+          attachmentDataUrl,
+        };
+      } else {
+        const id = inputId.value;
+        handovers.push({
+          id,
+          from,
+          to,
+          items,
+          longDescription,
+          priority,
+          status,
+          date,
+          actionBy,
+          attachmentName,
+          attachmentType,
+          attachmentSize,
+          attachmentDataUrl,
+        });
+      }
+
+      saveHandovers();
+      applyFilters();
+      handoverModal.hide();
+      attachmentInput.value = "";
+    });
+  }
+
+  function openEditHandover(id) {
+    const h = handovers.find(x => x.id === id);
+    if (!h) return;
+
+    isEditMode = true;
+    editingId = id;
+
+    handoverForm.reset();
+    refreshUserSelectOptions();
+
+    const fromName = h.from || "";
+
+    if (inputFrom) {
+      inputFrom.innerHTML = "";
+      if (fromName) {
+        const opt = document.createElement("option");
+        opt.value = fromName;
+        opt.textContent = fromName;
+        inputFrom.appendChild(opt);
+        inputFrom.value = fromName;
+      }
+      inputFrom.setAttribute("disabled", "disabled");
+    }
+
+    inputId.value = h.id;
+    inputTo.value = h.to;
+    inputItems.value = h.items;
+    inputLongDesc.value = h.longDescription || "";
+    inputPriority.value = h.priority || "P3";
+    inputStatus.value = h.status;
+    inputDate.value = h.date;
+    inputActionBy.value = h.actionBy || (users[0] ? users[0].name : "");
+    attachmentInput.value = "";
+
+    if (h.attachmentName && (h.attachmentDataUrl || h.attachmentUrl)) {
+      currentAttachmentInfo.textContent =
+        "Current attachment: " +
+        h.attachmentName +
+        (h.attachmentSize ? ` (${Math.round(h.attachmentSize / 1024)} KB)` : "");
+    } else {
+      currentAttachmentInfo.textContent = "No attachment";
+    }
+
+    const editable = canEditHandover(h);
+    editingReadOnly = !editable;
+    setHandoverFormReadOnly(!editable);
+
+    modalTitleEl.textContent = editable ? "Edit Handover" : "View Handover";
+    handoverModal.show();
+  }
+
+  // ===== Sidebar Navigation =====
+  function setActiveView(view, save = true) {
+    const navLinks = document.querySelectorAll(".sidebar-nav .nav-link");
+    const views = document.querySelectorAll(".view-section");
+
+    if (view === "admin-users") {
+      const acc = getLoggedInAccount();
+      if (!acc || acc.role !== "Admin") {
+        alert("Only Admin can access Users (Admin) page.");
+        return;
+      }
+    }
+
+    navLinks.forEach(link => {
+      const v = link.getAttribute("data-view");
+      link.classList.toggle("active", v === view);
+    });
+
+    views.forEach(section => {
+      const v = section.getAttribute("data-view");
+      section.classList.toggle("d-none", v !== view);
+    });
+
+    if (save) {
+      localStorage.setItem("warehouseActiveView", view);
+    }
+  }
+
+  function initSidebarNavigation() {
+    const navLinks = document.querySelectorAll(".sidebar-nav .nav-link");
+    navLinks.forEach(link => {
+      link.addEventListener("click", e => {
+        e.preventDefault();
+        const view = link.getAttribute("data-view");
+        if (!view) return;
+        setActiveView(view, true);
+      });
+    });
+  }
+
+  // ===== Employees =====
+  function renderUsers() {
+    const tbody = document.getElementById("users-tbody");
+    tbody.innerHTML = "";
+    users.forEach((u, index) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${index + 1}</td>
+        <td>${u.name}</td>
+        <td>${u.role || ""}</td>
+        <td>${u.email || ""}</td>
+        <td>
+          <button class="btn btn-sm btn-outline-secondary btn-edit-user" data-index="${index}">
+            <i class="bi bi-pencil"></i>
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    attachUserRowActions();
+  }
+
+  function attachUserRowActions() {
+    document.querySelectorAll(".btn-edit-user").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const idx = parseInt(btn.getAttribute("data-index"), 10);
+        openEditUser(idx);
+      });
+    });
+  }
+
+  function initUserForm() {
+    const form = document.getElementById("user-form");
+    const nameInput = document.getElementById("user-name");
+    const roleInput = document.getElementById("user-role");
+    const emailInput = document.getElementById("user-email");
+
+    form.addEventListener("submit", e => {
+      e.preventDefault();
+      const name = nameInput.value.trim();
+      const role = roleInput.value.trim();
+      const email = emailInput.value.trim();
+      if (!name) return;
+      users.push({ name, role, email });
+      saveUsers();
+      renderUsers();
+      refreshUserSelectOptions();
+      nameInput.value = "";
+      roleInput.value = "";
+      emailInput.value = "";
+    });
+  }
+
+  function initUserModal() {
+    const modalEl = document.getElementById("user-modal");
+    userModal = new bootstrap.Modal(modalEl);
+    userEditForm = document.getElementById("user-edit-form");
+    editUserNameInput = document.getElementById("edit-user-name");
+    editUserRoleInput = document.getElementById("edit-user-role");
+    editUserEmailInput = document.getElementById("edit-user-email");
+
+    userEditForm.addEventListener("submit", e => {
+      e.preventDefault();
+      if (editingUserIndex === null) return;
+      const name = editUserNameInput.value.trim();
+      const role = editUserRoleInput.value.trim();
+      const email = editUserEmailInput.value.trim();
+      if (!name) return;
+      users[editingUserIndex] = { name, role, email };
+      saveUsers();
+      renderUsers();
+      refreshUserSelectOptions();
+      userModal.hide();
+    });
+  }
+
+  function openEditUser(index) {
+    const u = users[index];
+    if (!u) return;
+    editingUserIndex = index;
+    editUserNameInput.value = u.name;
+    editUserRoleInput.value = u.role || "";
+    editUserEmailInput.value = u.email || "";
+    userModal.show();
+  }
+
+  // ===== Admin Accounts =====
+  function renderAccounts() {
+    const tbody = document.getElementById("accounts-tbody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+
+    accounts.forEach((acc, index) => {
+      const tr = document.createElement("tr");
+      const badgeClass =
+        acc.status === "Disabled"
+          ? "bg-secondary-subtle text-secondary"
+          : "bg-success-subtle text-success";
+      tr.innerHTML = `
+        <td>${index + 1}</td>
+        <td>${acc.username}</td>
+        <td>${acc.employeeName || "-"}</td>
+        <td>${acc.role || ""}</td>
+        <td>
+          <span class="badge rounded-pill ${badgeClass}">
+            ${acc.status || "Active"}
+          </span>
+        </td>
+        <td>
+          <button class="btn btn-sm btn-outline-secondary btn-edit-account" data-index="${index}">
+            <i class="bi bi-pencil"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-danger btn-delete-account" data-index="${index}">
+            <i class="bi bi-trash"></i>
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    attachAccountRowActions();
+    refreshActiveAccountSelect();
+  }
+
+  function attachAccountRowActions() {
+    document.querySelectorAll(".btn-edit-account").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const idx = parseInt(btn.getAttribute("data-index"), 10);
+        openEditAccount(idx);
+      });
+    });
+
+    document.querySelectorAll(".btn-delete-account").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const idx = parseInt(btn.getAttribute("data-index"), 10);
+        const acc = accounts[idx];
+        if (!acc) return;
+        const ok = confirm(`Are you sure you want to delete account "${acc.username}"?`);
+        if (!ok) return;
+
+        accounts.splice(idx, 1);
+        saveAccounts();
+        renderAccounts();
+        refreshActiveAccountSelect();
+
+        if (acc.username === getLoggedInUsername()) {
+          setLoggedInUsername("");
+          activeAccountUsername = "";
+          saveActiveAccount();
+          showLoginPage();
+          updateCurrentUserLabel();
+        }
+      });
+    });
+  }
+
+  function fillAccountEmployeeOptions() {
+    if (!accountEmployeeSelect) return;
+    accountEmployeeSelect.innerHTML = "";
+    const optNone = document.createElement("option");
+    optNone.value = "";
+    optNone.textContent = "(No linked employee)";
+    accountEmployeeSelect.appendChild(optNone);
+
+    users.forEach(u => {
+      const opt = document.createElement("option");
+      opt.value = u.name;
+      opt.textContent = u.name;
+      accountEmployeeSelect.appendChild(opt);
+    });
+  }
+
+  function initAccountModal() {
+    const modalEl = document.getElementById("account-modal");
+    accountModal = new bootstrap.Modal(modalEl);
+    accountForm = document.getElementById("account-form");
+    accountUsernameInput = document.getElementById("account-username");
+    accountEmployeeSelect = document.getElementById("account-employee");
+    accountRoleSelect = document.getElementById("account-role");
+    accountStatusSelect = document.getElementById("account-status");
+    accountPasswordInput = document.getElementById("account-password");
+
+    fillAccountEmployeeOptions();
+
+    const btnAdd = document.getElementById("btn-add-account");
+    if (btnAdd) {
+      btnAdd.addEventListener("click", () => {
+        const acc = getLoggedInAccount();
+        if (!acc || acc.role !== "Admin") {
+          alert("Only Admin can add accounts.");
+          return;
+        }
+        isEditAccount = false;
+        editingAccountIndex = null;
+        accountForm.reset();
+        fillAccountEmployeeOptions();
+        accountStatusSelect.value = "Active";
+        accountPasswordInput.value = "";
+        accountModal.show();
+      });
+    }
+
+    accountForm.addEventListener("submit", e => {
+      e.preventDefault();
+
+      const accLogged = getLoggedInAccount();
+      if (!accLogged || accLogged.role !== "Admin") {
+        alert("Only Admin can edit accounts.");
+        return;
+      }
+
+      const username = accountUsernameInput.value.trim();
+      const employeeName = accountEmployeeSelect.value || "";
+      const role = accountRoleSelect.value || "User";
+      const status = accountStatusSelect.value || "Active";
+      const rawPassword = (accountPasswordInput.value || "").trim();
+      if (!username) return;
+
+      if (isEditAccount && editingAccountIndex !== null) {
+        const existing = accounts[editingAccountIndex];
+        accounts[editingAccountIndex] = {
+          ...existing,
+          username,
+          employeeName,
+          role,
+          status,
+          password: rawPassword ? rawPassword : existing.password,
+        };
+      } else {
+        const password = rawPassword || "1234";
+        accounts.push({ username, employeeName, role, status, password });
+      }
+      saveAccounts();
+      renderAccounts();
+      refreshActiveAccountSelect();
+      accountPasswordInput.value = "";
+      accountModal.hide();
+    });
+  }
+
+  function openEditAccount(index) {
+    const acc = accounts[index];
+    if (!acc) return;
+
+    const accLogged = getLoggedInAccount();
+    if (!accLogged || accLogged.role !== "Admin") {
+      alert("Only Admin can edit accounts.");
+      return;
+    }
+
+    isEditAccount = true;
+    editingAccountIndex = index;
+    fillAccountEmployeeOptions();
+    accountUsernameInput.value = acc.username;
+    accountEmployeeSelect.value = acc.employeeName || "";
+    accountRoleSelect.value = acc.role || "User";
+    accountStatusSelect.value = acc.status || "Active";
+    accountPasswordInput.value = ""; // لا نعرض كلمة المرور الحالية، فقط نسمح بالتغيير
+    accountModal.show();
+  }
+
+  // ===== Login Handling =====
+  function validateLogin(username, password) {
+    normalizeAccountsPasswords();
+    const acc = accounts.find(a => a.username === username);
+    if (!acc) {
+      return { ok: false, message: "Invalid username or password." };
+    }
+    if (acc.status === "Disabled") {
+      return { ok: false, message: "This account is disabled." };
+    }
+    if (acc.password !== password) {
+      return { ok: false, message: "Invalid username or password." };
+    }
+    return { ok: true, account: acc };
+  }
+
+  function showLoginPage() {
+    const loginPageEl = document.getElementById("login-page");
+    const appShellEl = document.getElementById("app-shell");
+    if (loginPageEl) loginPageEl.style.display = "flex";
+    if (appShellEl) appShellEl.style.display = "none";
+  }
+
+  function showApp() {
+    const loginPageEl = document.getElementById("login-page");
+    const appShellEl = document.getElementById("app-shell");
+    if (loginPageEl) loginPageEl.style.display = "none";
+    if (appShellEl) appShellEl.style.display = "flex";
+
+    refreshActiveAccountSelect();
+    const select = document.getElementById("active-account-select");
+    if (select && activeAccountUsername) {
+      select.value = activeAccountUsername;
+    }
+    updateCurrentUserLabel();
+  }
+
+  function updateCurrentUserLabel() {
+    const label = document.getElementById("current-user-label");
+    if (!label) return;
+    const acc = getLoggedInAccount();
+    if (!acc) {
+      label.textContent = "Not logged in";
+    } else {
+      label.textContent = `Logged in as: ${acc.username} (${acc.role || "User"})`;
+    }
+  }
+
+  function initLogin() {
+    const loginForm = document.getElementById("login-form");
+    const loginUserInput = document.getElementById("login-username");
+    const loginPassInput = document.getElementById("login-password");
+    const loginErrorEl = document.getElementById("login-error");
+
+    if (!loginForm) return;
+
+    loginForm.addEventListener("submit", e => {
+      e.preventDefault();
+      const username = loginUserInput.value.trim();
+      const password = loginPassInput.value;
+
+      const result = validateLogin(username, password);
+      if (!result.ok) {
+        loginErrorEl.textContent = result.message;
+        loginErrorEl.style.display = "block";
+        return;
+      }
+
+      loginErrorEl.style.display = "none";
+      activeAccountUsername = result.account.username;
+      saveActiveAccount();
+      setLoggedInUsername(activeAccountUsername);
+
+      filteredHandovers = getVisibleHandovers();
+      showApp();
+      renderTable();
+      renderAccounts();
+      renderReports();
+      const savedView = localStorage.getItem("warehouseActiveView") || "dashboard";
+      setActiveView(savedView, false);
+    });
+
+    const storedLogin = getLoggedInUsername();
+    if (storedLogin) {
+      const acc = accounts.find(a => a.username === storedLogin && a.status !== "Disabled");
+      if (acc) {
+        activeAccountUsername = storedLogin;
+        saveActiveAccount();
+        filteredHandovers = getVisibleHandovers();
+        showApp();
+        renderTable();
+        renderAccounts();
+        renderReports();
+        const savedView = localStorage.getItem("warehouseActiveView") || "dashboard";
+        setActiveView(savedView, false);
+        return;
+      } else {
+        setLoggedInUsername("");
+      }
+    }
+
+    showLoginPage();
+  }
+
+  // ===== JSON Export/Import =====
+  function initExportJson() {
+    const btn = document.getElementById("btn-export-json");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      const acc = getLoggedInAccount();
+      if (!acc || acc.role !== "Admin") {
+        alert("Only Admin can export JSON.");
+        return;
+      }
+
+      const accountsExport = accounts.map(acc => ({
+        username: acc.username,
+        employeeName: acc.employeeName,
+        role: acc.role,
+        status: acc.status,
+      }));
+
+      const data = {
+        exportedAt: new Date().toISOString(),
+        handovers,
+        users,
+        accounts: accountsExport,
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const dateStr = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `warehouse-data-${dateStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  function initImportJson() {
+    const btn = document.getElementById("btn-import-json");
+    const input = document.getElementById("import-json-input");
+    if (!btn || !input) return;
+
+    btn.addEventListener("click", () => {
+      const acc = getLoggedInAccount();
+      if (!acc || acc.role !== "Admin") {
+        alert("Only Admin can import JSON.");
+        return;
+      }
+      input.click();
+    });
+
+    input.addEventListener("change", async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+
+        if (
+          !data ||
+          !Array.isArray(data.handovers) ||
+          !Array.isArray(data.users) ||
+          !Array.isArray(data.accounts)
+        ) {
+          alert(
+            "Invalid JSON structure.\nThe file must contain: handovers, users, and accounts arrays."
+          );
+          input.value = "";
+          return;
+        }
+
+        const ok = confirm(
+          "This will replace all current data (handovers, users, accounts) in this browser with the data from the file.\nDo you want to continue?"
+        );
+        if (!ok) {
+          input.value = "";
+          return;
+        }
+
+        handovers = data.handovers;
+        users = data.users;
+        accounts = data.accounts;
+        normalizeAccountsPasswords();
+
+        saveHandovers();
+        saveUsers();
+        saveAccounts();
+
+        filteredHandovers = getVisibleHandovers();
+
+        renderUsers();
+        refreshUserSelectOptions();
+        renderTable();
+        renderAccounts();
+        renderReports();
+        refreshActiveAccountSelect();
+
+        alert("Data imported successfully.");
+      } catch (err) {
+        console.error(err);
+        alert("An error occurred while reading or parsing the JSON file.");
+      } finally {
+        input.value = "";
+      }
+    });
+  }
+
+  // ===== Logout =====
+  function initLogout() {
+    const btn = document.getElementById("btn-logout");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      setLoggedInUsername("");
+      activeAccountUsername = "";
+      saveActiveAccount();
+      filteredHandovers = [];
+      updateCurrentUserLabel();
+      showLoginPage();
+    });
+  }
+
+  // ===== DOMContentLoaded =====
+  document.addEventListener("DOMContentLoaded", () => {
+    document
+      .getElementById("filter-from")
+      .addEventListener("change", applyFilters);
+    document
+      .getElementById("filter-to")
+      .addEventListener("change", applyFilters);
+    document
+      .getElementById("filter-status")
+      .addEventListener("change", applyFilters);
+    document
+      .getElementById("filter-priority")
+      .addEventListener("change", applyFilters);
+    document
+      .getElementById("filter-date-from")
+      .addEventListener("change", applyFilters);
+    document
+      .getElementById("filter-date-to")
+      .addEventListener("change", applyFilters);
+    document
+      .getElementById("filter-search")
+      .addEventListener("input", applyFilters);
+
+    document
+      .getElementById("btn-reset-filters")
+      .addEventListener("click", resetFilters);
+
+    const btnExcel = document.getElementById("btn-export-excel");
+    if (btnExcel) {
+      btnExcel.addEventListener("click", exportHandoverExcel);
+    }
+
+    loadUsers();
+    loadHandovers();
+    loadAccounts();
+    loadActiveAccount();
+
+    initSidebarNavigation();
+    initUserForm();
+    initUserModal();
+    renderUsers();
+
+    initHandoverModal();
+    initAccountModal();
+
+    refreshUserSelectOptions();
+    renderAccounts();
+    initExportJson();
+    initImportJson();
+    refreshActiveAccountSelect();
+    initLogout();
+
+    initLogin();
+  });
+</script>
+</body>
+</html>
