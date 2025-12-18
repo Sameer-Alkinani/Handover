@@ -335,7 +335,6 @@
           <i class="bi bi-box-seam"></i>
           <span>Handovers</span>
         </a>
-        <!-- Deleted handovers page -->
         <a href="#" class="nav-link" data-view="deleted-handovers">
           <i class="bi bi-trash3"></i>
           <span>Deleted Handovers</span>
@@ -359,7 +358,7 @@
       <button class="btn btn-sm btn-outline-light w-100 mb-2" id="btn-logout">
         <i class="bi bi-box-arrow-right"></i> Logout
       </button>
-      <div style="font-size:0.75rem;color:#9fb3ff;">v1.4 – Deleted & Restore</div>
+      <div style="font-size:0.75rem;color:#9fb3ff;">v1.5 – ActionBy Chips + Creator Visibility</div>
     </div>
   </aside>
 
@@ -476,28 +475,16 @@
           </div>
           <div>
             <label class="form-label form-label-sm">Date From</label>
-            <input
-              type="date"
-              id="filter-date-from"
-              class="form-control form-control-sm"
-            />
+            <input type="date" id="filter-date-from" class="form-control form-control-sm" />
           </div>
           <div>
             <label class="form-label form-label-sm">Date To</label>
-            <input
-              type="date"
-              id="filter-date-to"
-              class="form-control form-control-sm"
-            />
+            <input type="date" id="filter-date-to" class="form-control form-control-sm" />
           </div>
           <div>
             <label class="form-label form-label-sm">Search</label>
-            <input
-              type="text"
-              id="filter-search"
-              class="form-control form-control-sm"
-              placeholder="Search by ID or item..."
-            />
+            <input type="text" id="filter-search" class="form-control form-control-sm"
+                   placeholder="Search by ID or item..." />
           </div>
         </div>
       </section>
@@ -508,10 +495,7 @@
           <section class="table-card table-card--resizable">
             <div class="d-flex justify-content-between align-items-center mb-2">
               <h6 class="mb-0">Handover List</h6>
-              <span
-                id="table-count"
-                style="font-size: 0.8rem; color: #6b7280"
-              ></span>
+              <span id="table-count" style="font-size: 0.8rem; color: #6b7280"></span>
             </div>
             <div class="table-responsive">
               <table class="table table-sm align-middle">
@@ -529,8 +513,7 @@
                   <th style="width: 120px;">ACTIONS</th>
                 </tr>
                 </thead>
-                <tbody id="handover-tbody">
-                </tbody>
+                <tbody id="handover-tbody"></tbody>
               </table>
             </div>
           </section>
@@ -573,8 +556,7 @@
               <th style="width: 120px;">ACTIONS</th>
             </tr>
             </thead>
-            <tbody id="completed-tbody">
-            </tbody>
+            <tbody id="completed-tbody"></tbody>
           </table>
         </div>
       </div>
@@ -612,8 +594,7 @@
               <th style="width: 90px;">ACTIONS</th>
             </tr>
             </thead>
-            <tbody id="deleted-handover-tbody">
-            </tbody>
+            <tbody id="deleted-handover-tbody"></tbody>
           </table>
         </div>
       </div>
@@ -666,8 +647,7 @@
               <th style="width: 70px;">Actions</th>
             </tr>
             </thead>
-            <tbody id="users-tbody">
-            </tbody>
+            <tbody id="users-tbody"></tbody>
           </table>
         </div>
       </div>
@@ -679,7 +659,7 @@
         <div>
           <div class="top-bar-title">Users (Admin)</div>
           <div style="font-size: 0.85rem; color: #6b7280">
-            Manage application accounts (username, role, and link to employees).  
+            Manage application accounts (username, role, and link to employees).
             Passwords are local to this browser only.
           </div>
         </div>
@@ -689,8 +669,8 @@
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h6 class="mb-0">User Accounts</h6>
           <div class="d-flex gap-2">
-            <!-- New button to resequence HNDR IDs -->
-            <button class="btn btn-sm btn-outline-warning" id="btn-resequence-ids" title="Resequence all HNDR IDs from 0001 by date">
+            <button class="btn btn-sm btn-outline-warning" id="btn-resequence-ids"
+                    title="Resequence all HNDR IDs from 0001 by date">
               <i class="bi bi-arrow-clockwise"></i> Resequence HNDR IDs
             </button>
             <button class="btn btn-sm btn-primary" id="btn-add-account">
@@ -710,8 +690,7 @@
               <th style="width: 100px;">Actions</th>
             </tr>
             </thead>
-            <tbody id="accounts-tbody">
-            </tbody>
+            <tbody id="accounts-tbody"></tbody>
           </table>
         </div>
       </div>
@@ -735,12 +714,7 @@
             <i class="bi bi-download"></i> Export JSON (Admin)
           </button>
 
-          <input
-            type="file"
-            id="import-json-input"
-            accept="application/json"
-            hidden
-          />
+          <input type="file" id="import-json-input" accept="application/json" hidden />
         </div>
       </div>
 
@@ -777,7 +751,7 @@
         <div class="col-lg-6">
           <div class="chart-card">
             <h6>By Status (Visible Handovers)</h6>
-            <p class="text-muted mb-2">For Admin/Supervisor: all handovers. For others: only own / assigned handovers.</p>
+            <p class="text-muted mb-2">For Admin/Supervisor: all handovers. For others: own created + assigned handovers.</p>
             <canvas id="reports-status-chart" height="220"></canvas>
           </div>
         </div>
@@ -794,63 +768,43 @@
 </div>
 
 <!-- Modal: New/Edit Handover -->
-<div
-  class="modal fade"
-  id="handover-modal"
-  tabindex="-1"
-  aria-hidden="true"
->
+<div class="modal fade" id="handover-modal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <form id="handover-form">
         <div class="modal-header">
           <h5 class="modal-title" id="handover-modal-title">New Handover</h5>
-          <button
-            type="button"
-            class="btn-close"
-            data-bs-dismiss="modal"
-            aria-label="Close"
-          ></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
+
         <div class="modal-body">
           <div class="mb-2">
             <label class="form-label">Handover ID</label>
-            <input
-              type="text"
-              class="form-control"
-              id="handover-id"
-              readonly
-            />
+            <input type="text" class="form-control" id="handover-id" readonly />
           </div>
+
           <div class="mb-2">
             <label class="form-label">From (Employee)</label>
-            <select class="form-select" id="handover-from" required>
-            </select>
+            <select class="form-select" id="handover-from" required></select>
           </div>
+
           <div class="mb-2">
             <label class="form-label">To (Employee)</label>
-            <select class="form-select" id="handover-to" required>
-            </select>
+            <select class="form-select" id="handover-to" required></select>
           </div>
+
           <div class="mb-2">
             <label class="form-label">Items Description</label>
-            <input
-              type="text"
-              class="form-control"
-              id="handover-items"
-              placeholder="e.g. 150 cartons of product X"
-              required
-            />
+            <input type="text" class="form-control" id="handover-items"
+                   placeholder="e.g. 150 cartons of product X" required />
           </div>
+
           <div class="mb-2">
             <label class="form-label">Long Description</label>
-            <textarea
-              class="form-control"
-              id="handover-long-desc"
-              rows="3"
-              placeholder="Optional detailed notes about this handover (reason, transport, additional comments)"
-            ></textarea>
+            <textarea class="form-control" id="handover-long-desc" rows="3"
+              placeholder="Optional detailed notes about this handover (reason, transport, additional comments)"></textarea>
           </div>
+
           <div class="mb-2">
             <label class="form-label">Priority Level</label>
             <select class="form-select" id="handover-priority" required>
@@ -860,6 +814,7 @@
               <option value="P4">P4 - Negligible</option>
             </select>
           </div>
+
           <div class="mb-2">
             <label class="form-label">Status</label>
             <select class="form-select" id="handover-status" required>
@@ -869,39 +824,44 @@
               <option>Delayed</option>
             </select>
           </div>
+
           <div class="mb-2">
             <label class="form-label">Date</label>
             <input type="date" class="form-control" id="handover-date" required />
           </div>
+
+          <!-- ✅ UPDATED Action By (Smooth Multi Select + Chips) -->
           <div class="mb-2">
             <label class="form-label">Action By</label>
-            <!-- UPDATED: allow assigning multiple people -->
-            <select class="form-select" id="handover-action-by" multiple required></select>
-            <div class="form-text">Hold Ctrl (Windows) / Cmd (Mac) to select multiple employees.</div>
+
+            <div class="input-group mb-2">
+              <input id="actionby-search" class="form-control" placeholder="Type a name and press Add" list="users-datalist" />
+              <button type="button" class="btn btn-outline-primary" id="btn-actionby-add">Add</button>
+            </div>
+
+            <div id="actionby-chips" class="d-flex flex-wrap gap-2"></div>
+
+            <!-- Hidden select to keep existing logic / required validation -->
+            <select class="form-select d-none" id="handover-action-by" multiple required></select>
+
+            <datalist id="users-datalist"></datalist>
+            <div class="form-text">Add one or more employees easily. Click (x) to remove.</div>
           </div>
+
           <div class="mb-2">
             <label class="form-label">Attachment (optional)</label>
-            <div id="current-attachment-info" class="small text-muted mb-1">
-              No attachment
-            </div>
+            <div id="current-attachment-info" class="small text-muted mb-1">No attachment</div>
             <input type="file" class="form-control" id="handover-attachment" />
             <div class="form-text">
-              You can attach any file (image, PDF, Word, Excel, email export, etc.).  
+              You can attach any file (image, PDF, Word, Excel, email export, etc.).
               Note: very large files may not be saved due to browser storage limits.
             </div>
           </div>
         </div>
+
         <div class="modal-footer">
-          <button
-            type="button"
-            class="btn btn-light"
-            data-bs-dismiss="modal"
-          >
-            Cancel
-          </button>
-          <button type="submit" class="btn btn-primary" id="handover-save-btn">
-            Save
-          </button>
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="handover-save-btn">Save</button>
         </div>
       </form>
     </div>
@@ -909,23 +869,13 @@
 </div>
 
 <!-- Modal: Edit User (employee) -->
-<div
-  class="modal fade"
-  id="user-modal"
-  tabindex="-1"
-  aria-hidden="true"
->
+<div class="modal fade" id="user-modal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <form id="user-edit-form">
         <div class="modal-header">
           <h5 class="modal-title">Edit User</h5>
-          <button
-            type="button"
-            class="btn-close"
-            data-bs-dismiss="modal"
-            aria-label="Close"
-          ></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <div class="mb-2">
@@ -942,16 +892,8 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button
-            type="button"
-            class="btn btn-light"
-            data-bs-dismiss="modal"
-          >
-            Cancel
-          </button>
-          <button type="submit" class="btn btn-primary">
-            Save changes
-          </button>
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save changes</button>
         </div>
       </form>
     </div>
@@ -959,23 +901,13 @@
 </div>
 
 <!-- Modal: Admin User Account -->
-<div
-  class="modal fade"
-  id="account-modal"
-  tabindex="-1"
-  aria-hidden="true"
->
+<div class="modal fade" id="account-modal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <form id="account-form">
         <div class="modal-header">
           <h5 class="modal-title">User Account</h5>
-          <button
-            type="button"
-            class="btn-close"
-            data-bs-dismiss="modal"
-            aria-label="Close"
-          ></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <div class="mb-2">
@@ -984,8 +916,7 @@
           </div>
           <div class="mb-2">
             <label class="form-label">Linked Employee (optional)</label>
-            <select id="account-employee" class="form-select">
-            </select>
+            <select id="account-employee" class="form-select"></select>
           </div>
           <div class="mb-2">
             <label class="form-label">Role</label>
@@ -1005,32 +936,20 @@
           </div>
           <div class="mb-2">
             <label class="form-label">Password (Admin only)</label>
-            <input
-              type="password"
-              id="account-password"
-              class="form-control"
-              placeholder="Leave blank to keep current password"
-            />
+            <input type="password" id="account-password" class="form-control"
+                   placeholder="Leave blank to keep current password" />
             <div class="form-text">
               Only Admin can set or change passwords for user accounts.
             </div>
           </div>
           <div class="alert alert-warning mt-2 mb-0" style="font-size:0.8rem;">
-            Passwords are stored only in this browser (prototype).  
+            Passwords are stored only in this browser (prototype).
             Exported JSON does not include passwords for safety.
           </div>
         </div>
         <div class="modal-footer">
-          <button
-            type="button"
-            class="btn btn-light"
-            data-bs-dismiss="modal"
-          >
-            Cancel
-          </button>
-          <button type="submit" class="btn btn-primary">
-            Save account
-          </button>
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save account</button>
         </div>
       </form>
     </div>
@@ -1046,7 +965,6 @@
   // Storage key for the global serial counter
   const ID_COUNTER_STORAGE_KEY = "warehouseLastHndrSerial";
 
-  // Load last serial from storage
   function loadIdCounter() {
     try {
       const stored = localStorage.getItem(ID_COUNTER_STORAGE_KEY);
@@ -1057,17 +975,12 @@
     }
   }
 
-  // Save last serial
   function saveIdCounter(last) {
     try {
       localStorage.setItem(ID_COUNTER_STORAGE_KEY, String(last || 0));
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   }
 
-  // Resequence a given list based on its order (uses the date field)
-  // One continuous serial even if the month changes
   function normalizeIdsForList(list, lastSerial) {
     if (!Array.isArray(list) || list.length === 0) return lastSerial;
 
@@ -1080,8 +993,8 @@
       const dateStr = h.date || "";
       const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
       if (m) {
-        yy = m[1].slice(-2); // last two digits of year
-        mm = m[2];           // month in 01–12 format
+        yy = m[1].slice(-2);
+        mm = m[2];
       } else {
         const today = new Date();
         yy = String(today.getFullYear()).slice(-2);
@@ -1089,14 +1002,13 @@
       }
 
       counter += 1;
-      const serial = String(counter).padStart(4, "0"); // 1 → 0001
+      const serial = String(counter).padStart(4, "0");
       h.id = `HNDR-${yy}-${mm}-${serial}`;
     });
 
     return counter;
   }
 
-  // Resequence all current tasks (handovers + deletedHandovers) so they begin at 0001 ordered by date
   function resequenceAllHandoverIdsFromOne() {
     const all = [...handovers, ...deletedHandovers];
     if (all.length === 0) {
@@ -1104,7 +1016,6 @@
       return;
     }
 
-    // Sort by date ascending, then by current id as a fallback
     all.sort((a, b) => {
       const da = a.date || "";
       const db = b.date || "";
@@ -1122,7 +1033,6 @@
     { name: "Ardasher A. Ahmad",   role: "Supervisor", email: "" },
   ];
 
-  // Default dates in 09/2025 so the first serials start from there
   const defaultHandovers = [
     {
       id: "HNDR-25-09-0001",
@@ -1195,7 +1105,7 @@
 
   let activeAccountUsername = null;
 
-  // ====== UPDATED: helpers to support multi "Action By" (string OR array) ======
+  // ===== Multi "Action By" helpers (string OR array) =====
   function getActionByArray(h) {
     const v = h ? h.actionBy : null;
     if (Array.isArray(v)) {
@@ -1222,16 +1132,69 @@
       opt.selected = set.has(opt.value);
     });
   }
-  // ==========================================================================
+
+  // ✅ NEW: first-name only for table display
+  function getFirstName(fullName) {
+    const s = String(fullName || "").trim();
+    if (!s) return "";
+    return s.split(/\s+/)[0];
+  }
+
+  function getActionByDisplayTable(h) {
+    return getActionByArray(h).map(getFirstName).filter(Boolean).join(", ");
+  }
+
+  // ✅ NEW: Smooth ActionBy chips selection (no Ctrl/Cmd)
+  let actionBySelected = [];
+
+  function syncHiddenActionBySelect() {
+    if (!inputActionBy) return;
+    Array.from(inputActionBy.options).forEach(opt => {
+      opt.selected = actionBySelected.includes(opt.value);
+    });
+  }
+
+  function renderActionByChips() {
+    const wrap = document.getElementById("actionby-chips");
+    if (!wrap) return;
+
+    wrap.innerHTML = "";
+    actionBySelected.forEach(name => {
+      const chip = document.createElement("span");
+      chip.className =
+        "badge rounded-pill bg-primary-subtle text-primary d-inline-flex align-items-center gap-2";
+      chip.style.padding = "0.5rem 0.7rem";
+      chip.innerHTML = `
+        <span>${name}</span>
+        <button type="button" class="btn btn-sm p-0 border-0" style="line-height:1;" aria-label="Remove">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      `;
+      chip.querySelector("button").addEventListener("click", () => {
+        actionBySelected = actionBySelected.filter(x => x !== name);
+        syncHiddenActionBySelect();
+        renderActionByChips();
+      });
+      wrap.appendChild(chip);
+    });
+
+    syncHiddenActionBySelect();
+  }
+
+  function addActionByName(name) {
+    const n = String(name || "").trim();
+    if (!n) return;
+    if (!users.some(u => u.name === n)) return;
+    if (!actionBySelected.includes(n)) actionBySelected.push(n);
+    renderActionByChips();
+  }
+  // ======================================================
 
   function loadUsers() {
     const saved = localStorage.getItem("warehouseUsers");
     if (saved) {
-      try {
-        users = JSON.parse(saved);
-      } catch {
-        users = [...defaultUsers];
-      }
+      try { users = JSON.parse(saved); }
+      catch { users = [...defaultUsers]; }
     } else {
       users = [...defaultUsers];
     }
@@ -1244,11 +1207,8 @@
   function loadHandovers() {
     const saved = localStorage.getItem("warehouseHandovers");
     if (saved) {
-      try {
-        handovers = JSON.parse(saved);
-      } catch {
-        handovers = [...defaultHandovers];
-      }
+      try { handovers = JSON.parse(saved); }
+      catch { handovers = [...defaultHandovers]; }
     } else {
       handovers = [...defaultHandovers];
     }
@@ -1262,11 +1222,8 @@
   function loadDeletedHandovers() {
     const saved = localStorage.getItem("warehouseDeletedHandovers");
     if (saved) {
-      try {
-        deletedHandovers = JSON.parse(saved);
-      } catch {
-        deletedHandovers = [];
-      }
+      try { deletedHandovers = JSON.parse(saved); }
+      catch { deletedHandovers = []; }
     } else {
       deletedHandovers = [];
     }
@@ -1287,11 +1244,8 @@
   function loadAccounts() {
     const saved = localStorage.getItem("warehouseAccounts");
     if (saved) {
-      try {
-        accounts = JSON.parse(saved);
-      } catch {
-        accounts = [...defaultAccounts];
-      }
+      try { accounts = JSON.parse(saved); }
+      catch { accounts = [...defaultAccounts]; }
     } else {
       accounts = [...defaultAccounts];
     }
@@ -1339,6 +1293,7 @@
   }
 
   // ===== Visibility rules =====
+  // ✅ UPDATED: user sees tasks they CREATED (from) + tasks assigned (Action By)
   function getVisibleHandovers() {
     const acc = getLoggedInAccount();
     if (!acc) return [];
@@ -1350,8 +1305,7 @@
     const empName = acc.employeeName?.trim() || "";
     if (!empName) return [];
 
-    // UPDATED: allow visibility when user is in Action By list
-    return handovers.filter(h => isUserAssigned(h, empName));
+    return handovers.filter(h => (h.from === empName) || isUserAssigned(h, empName));
   }
 
   function canEditHandover(h) {
@@ -1363,22 +1317,18 @@
     if (!empName) return false;
 
     if (acc.role === "User") {
-      // UPDATED: allow edit if user is in Action By list
       return isUserAssigned(h, empName) || h.to === empName;
     }
     return false;
   }
 
-  // Generate a new ID for the next handover (based on stored serial)
   function generateNextId() {
     const today = new Date();
     const year = String(today.getFullYear()).slice(-2);
     const month = String(today.getMonth() + 1).padStart(2, "0");
 
     let lastSerial = loadIdCounter();
-    if (typeof lastSerial !== "number" || isNaN(lastSerial)) {
-      lastSerial = 0;
-    }
+    if (typeof lastSerial !== "number" || isNaN(lastSerial)) lastSerial = 0;
     lastSerial += 1;
     saveIdCounter(lastSerial);
 
@@ -1388,16 +1338,11 @@
 
   function getStatusClass(status) {
     switch (status) {
-      case "Pending":
-        return "status-badge status-pending";
-      case "Completed":
-        return "status-badge status-completed";
-      case "Delayed":
-        return "status-badge status-delayed";
-      case "In Progress":
-        return "status-badge status-inprogress";
-      default:
-        return "status-badge";
+      case "Pending": return "status-badge status-pending";
+      case "Completed": return "status-badge status-completed";
+      case "Delayed": return "status-badge status-delayed";
+      case "In Progress": return "status-badge status-inprogress";
+      default: return "status-badge";
     }
   }
 
@@ -1413,8 +1358,6 @@
     filteredHandovers.forEach(h => {
       const linkUrl = h.attachmentDataUrl || h.attachmentUrl || null;
       const canEdit = canEditHandover(h);
-
-      // UPDATED: assigned badge if user is included in Action By list
       const isAssignedToUser = isUserAssigned(h, empName);
 
       let actionsHtml = `
@@ -1448,7 +1391,7 @@
         <td><span class="${getStatusClass(h.status)}">${h.status}</span></td>
         <td>${h.date}</td>
         <td>
-          ${getActionByDisplay(h) || ""}
+          ${getActionByDisplayTable(h) || ""}
           ${
             isAssignedToUser
               ? `<span class="badge bg-primary-subtle text-primary ms-1" title="Task assigned to you">Assigned to you</span>`
@@ -1458,9 +1401,7 @@
         <td>
           ${
             linkUrl
-              ? `<a href="${linkUrl}"
-                     target="_blank"
-                     class="btn btn-sm btn-outline-primary"
+              ? `<a href="${linkUrl}" target="_blank" class="btn btn-sm btn-outline-primary"
                      title="${h.attachmentName || "Attachment"}"
                      download="${h.attachmentName || "attachment"}">
                    <i class="bi bi-paperclip"></i>
@@ -1473,8 +1414,7 @@
       tbody.appendChild(tr);
     });
 
-    document.getElementById("table-count").textContent =
-      filteredHandovers.length + " records";
+    document.getElementById("table-count").textContent = filteredHandovers.length + " records";
 
     renderCompletedTable();
     attachRowActions();
@@ -1523,7 +1463,7 @@
         <td><span class="${getStatusClass(h.status)}">${h.status}</span></td>
         <td>${h.date}</td>
         <td>
-          ${getActionByDisplay(h) || ""}
+          ${getActionByDisplayTable(h) || ""}
           ${
             isAssignedToUser
               ? `<span class="badge bg-primary-subtle text-primary ms-1" title="Task assigned to you">Assigned to you</span>`
@@ -1533,9 +1473,7 @@
         <td>
           ${
             linkUrl
-              ? `<a href="${linkUrl}"
-                     target="_blank"
-                     class="btn btn-sm btn-outline-primary"
+              ? `<a href="${linkUrl}" target="_blank" class="btn btn-sm btn-outline-primary"
                      title="${h.attachmentName || "Attachment"}"
                      download="${h.attachmentName || "attachment"}">
                    <i class="bi bi-paperclip"></i>
@@ -1548,9 +1486,7 @@
       tbody.appendChild(tr);
     });
 
-    if (countEl) {
-      countEl.textContent = completed.length + " records";
-    }
+    if (countEl) countEl.textContent = completed.length + " records";
   }
 
   function renderDeletedHandovers() {
@@ -1584,13 +1520,11 @@
         <td>${h.priority || "-"}</td>
         <td><span class="${getStatusClass(h.status)}">${h.status}</span></td>
         <td>${h.date}</td>
-        <td>${getActionByDisplay(h) || ""}</td>
+        <td>${getActionByDisplayTable(h) || ""}</td>
         <td>
           ${
             linkUrl
-              ? `<a href="${linkUrl}"
-                     target="_blank"
-                     class="btn btn-sm btn-outline-primary"
+              ? `<a href="${linkUrl}" target="_blank" class="btn btn-sm btn-outline-primary"
                      title="${h.attachmentName || "Attachment"}"
                      download="${h.attachmentName || "attachment"}">
                    <i class="bi bi-paperclip"></i>
@@ -1603,9 +1537,7 @@
       tbody.appendChild(tr);
     });
 
-    if (countEl) {
-      countEl.textContent = deletedHandovers.length + " records";
-    }
+    if (countEl) countEl.textContent = deletedHandovers.length + " records";
 
     attachDeletedRowActions();
   }
@@ -1696,9 +1628,7 @@
     const priority = document.getElementById("filter-priority").value;
     const dateFrom = document.getElementById("filter-date-from").value;
     const dateTo = document.getElementById("filter-date-to").value;
-    const search = document
-      .getElementById("filter-search")
-      .value.toLowerCase();
+    const search = document.getElementById("filter-search").value.toLowerCase();
 
     const base = getVisibleHandovers();
 
@@ -1714,8 +1644,7 @@
       if (dateTo && h.date > dateTo) ok = false;
 
       if (search) {
-        const text =
-          (h.id + " " + h.items + " " + h.from + " " + h.to).toLowerCase();
+        const text = (h.id + " " + h.items + " " + h.from + " " + h.to).toLowerCase();
         if (!text.includes(search)) ok = false;
       }
 
@@ -1776,31 +1705,18 @@
       type: "bar",
       data: {
         labels: ["Pending", "In Progress", "Completed", "Delayed"],
-        datasets: [
-          {
-            label: "Handovers",
-            data: [pending, inProgress, completed, delayed],
-          },
-        ],
+        datasets: [{ label: "Handovers", data: [pending, inProgress, completed, delayed] }],
       },
       options: {
         responsive: true,
-        plugins: {
-          legend: { display: false },
-        },
+        plugins: { legend: { display: false } },
         scales: {
-          x: {
-            ticks: { font: { size: 11 } },
-          },
-          y: {
-            beginAtZero: true,
-            ticks: { stepSize: 1 },
-          },
+          x: { ticks: { font: { size: 11 } } },
+          y: { beginAtZero: true, ticks: { stepSize: 1 } },
         },
       },
     });
 
-    // UPDATED: count handovers per each assigned person when Action By is multi
     const byUser = {};
     base.forEach(h => {
       const assignees = getActionByArray(h);
@@ -1820,28 +1736,13 @@
     if (reportsUserChart) reportsUserChart.destroy();
     reportsUserChart = new Chart(userCanvas.getContext("2d"), {
       type: "bar",
-      data: {
-        labels: userLabels,
-        datasets: [
-          {
-            label: "Handovers",
-            data: userData,
-          },
-        ],
-      },
+      data: { labels: userLabels, datasets: [{ label: "Handovers", data: userData }] },
       options: {
         responsive: true,
-        plugins: {
-          legend: { display: false },
-        },
+        plugins: { legend: { display: false } },
         scales: {
-          x: {
-            ticks: { font: { size: 11 } },
-          },
-          y: {
-            beginAtZero: true,
-            ticks: { stepSize: 1 },
-          },
+          x: { ticks: { font: { size: 11 } } },
+          y: { beginAtZero: true, ticks: { stepSize: 1 } },
         },
       },
     });
@@ -1849,10 +1750,7 @@
 
   // ===== Excel Export =====
   function exportHandoverExcel() {
-    const source =
-      filteredHandovers && filteredHandovers.length > 0
-        ? filteredHandovers
-        : getVisibleHandovers();
+    const source = (filteredHandovers && filteredHandovers.length > 0) ? filteredHandovers : getVisibleHandovers();
 
     const data = source.map(h => ({
       "HNDR ID": h.id,
@@ -1863,7 +1761,6 @@
       "Priority": h.priority || "",
       "Status": h.status || "",
       "Date": h.date || "",
-      // UPDATED: export Action By as comma-separated list
       "Action By": getActionByDisplay(h) || "",
       "Attachment Name": h.attachmentName || "None",
       "Attachment Link": h.attachmentDataUrl || h.attachmentUrl || "",
@@ -1905,15 +1802,10 @@
             if (nameColIndex !== null) {
               const nameAddress = XLSX.utils.encode_cell({ c: nameColIndex, r: R });
               const nameCell = ws[nameAddress];
-              if (nameCell && nameCell.v && nameCell.v !== "None") {
-                displayText = nameCell.v;
-              }
+              if (nameCell && nameCell.v && nameCell.v !== "None") displayText = nameCell.v;
             }
 
-            cell.l = {
-              Target: url,
-              Tooltip: "Open attachment in browser",
-            };
+            cell.l = { Target: url, Tooltip: "Open attachment in browser" };
             cell.v = displayText;
           }
         }
@@ -1949,9 +1841,7 @@
       opt.textContent = v;
       select.appendChild(opt);
     });
-    if (current && values.includes(current)) {
-      select.value = current;
-    }
+    if (current && values.includes(current)) select.value = current;
   }
 
   function refreshUserSelectOptions() {
@@ -1962,16 +1852,27 @@
     setSelectOptions(filterFrom, names, true, "All");
     setSelectOptions(filterTo, names, true, "All");
 
+    // ✅ fill datalist for ActionBy search
+    const dl = document.getElementById("users-datalist");
+    if (dl) {
+      dl.innerHTML = "";
+      names.forEach(n => {
+        const opt = document.createElement("option");
+        opt.value = n;
+        dl.appendChild(opt);
+      });
+    }
+
     if (inputTo && inputActionBy) {
       setSelectOptions(inputTo, names, false);
-      // for multi-select: just set options; selection handled elsewhere
       setSelectOptions(inputActionBy, names, false);
+      // keep chips synced
+      syncHiddenActionBySelect();
     }
 
     fillAccountEmployeeOptions();
   }
 
-  // From (new handover) limited to logged-in employee
   function setupFromForNewHandover() {
     if (!inputFrom) return;
 
@@ -1989,9 +1890,7 @@
     } else {
       const names = users.map(u => u.name);
       setSelectOptions(inputFrom, names, false);
-      if (names.length > 0) {
-        inputFrom.value = names[0];
-      }
+      if (names.length > 0) inputFrom.value = names[0];
     }
 
     inputFrom.setAttribute("disabled", "disabled");
@@ -2026,31 +1925,22 @@
 
   function setHandoverFormReadOnly(readOnly) {
     const fields = [
-      inputTo,
-      inputItems,
-      inputLongDesc,
-      inputPriority,
-      inputStatus,
-      inputDate,
-      inputActionBy,
+      inputTo, inputItems, inputLongDesc, inputPriority,
+      inputStatus, inputDate,
+      document.getElementById("actionby-search"),
+      document.getElementById("btn-actionby-add"),
       attachmentInput,
     ];
+
     fields.forEach(el => {
       if (!el) return;
-      if (readOnly) {
-        el.setAttribute("disabled", "disabled");
-      } else {
-        el.removeAttribute("disabled");
-      }
+      if (readOnly) el.setAttribute("disabled", "disabled");
+      else el.removeAttribute("disabled");
     });
 
-    if (inputFrom) {
-      inputFrom.setAttribute("disabled", "disabled");
-    }
+    if (inputFrom) inputFrom.setAttribute("disabled", "disabled");
 
-    if (handoverSaveBtn) {
-      handoverSaveBtn.style.display = readOnly ? "none" : "inline-block";
-    }
+    if (handoverSaveBtn) handoverSaveBtn.style.display = readOnly ? "none" : "inline-block";
   }
 
   function initHandoverModal() {
@@ -2073,6 +1963,25 @@
     handoverSaveBtn = document.getElementById("handover-save-btn");
 
     refreshUserSelectOptions();
+
+    // ✅ ActionBy add button handlers
+    const actionBySearch = document.getElementById("actionby-search");
+    const btnAddActionBy = document.getElementById("btn-actionby-add");
+    if (btnAddActionBy && actionBySearch) {
+      btnAddActionBy.addEventListener("click", () => {
+        addActionByName(actionBySearch.value);
+        actionBySearch.value = "";
+        actionBySearch.focus();
+      });
+
+      actionBySearch.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          addActionByName(actionBySearch.value);
+          actionBySearch.value = "";
+        }
+      });
+    }
 
     const openButtons = [
       document.getElementById("btn-add-handover"),
@@ -2098,6 +2007,7 @@
         isEditMode = false;
         editingId = null;
         editingReadOnly = false;
+
         handoverForm.reset();
         inputId.value = generateNextId();
         inputDate.value = new Date().toISOString().slice(0, 10);
@@ -2107,20 +2017,15 @@
         inputPriority.value = "P3";
 
         refreshUserSelectOptions();
-
         setupFromForNewHandover();
 
-        if (users.length > 0) {
-          inputTo.value = users[0].name;
-        }
+        if (users.length > 0) inputTo.value = users[0].name;
 
-        const loggedAcc = getLoggedInAccount();
-        if (loggedAcc && loggedAcc.employeeName) {
-          // UPDATED: select one (default) inside multi-select
-          setMultiSelectValues(inputActionBy, [loggedAcc.employeeName]);
-        } else if (users.length > 0) {
-          setMultiSelectValues(inputActionBy, [users[0].name]);
-        }
+        // ✅ default ActionBy = logged-in employee
+        actionBySelected = [];
+        if (acc && acc.employeeName) actionBySelected = [acc.employeeName];
+        else if (users.length > 0) actionBySelected = [users[0].name];
+        renderActionByChips();
 
         setHandoverFormReadOnly(false);
         modalTitleEl.textContent = "New Handover";
@@ -2130,7 +2035,6 @@
 
     handoverForm.addEventListener("submit", async e => {
       e.preventDefault();
-
       if (editingReadOnly) return;
 
       const acc = getLoggedInAccount();
@@ -2155,8 +2059,8 @@
       const status = inputStatus.value;
       const date = inputDate.value;
 
-      // UPDATED: read multiple selected employees
-      const actionBy = Array.from(inputActionBy.selectedOptions).map(o => o.value);
+      // ✅ take ActionBy from chips
+      const actionBy = [...actionBySelected];
 
       const file = attachmentInput.files[0] || null;
 
@@ -2195,35 +2099,16 @@
         if (idx === -1) return;
         handovers[idx] = {
           ...handovers[idx],
-          from,
-          to,
-          items,
-          longDescription,
-          priority,
-          status,
-          date,
-          actionBy, // UPDATED
-          attachmentName,
-          attachmentType,
-          attachmentSize,
-          attachmentDataUrl,
+          from, to, items, longDescription, priority, status, date,
+          actionBy,
+          attachmentName, attachmentType, attachmentSize, attachmentDataUrl,
         };
       } else {
         const id = inputId.value;
         handovers.push({
-          id,
-          from,
-          to,
-          items,
-          longDescription,
-          priority,
-          status,
-          date,
-          actionBy, // UPDATED
-          attachmentName,
-          attachmentType,
-          attachmentSize,
-          attachmentDataUrl,
+          id, from, to, items, longDescription, priority, status, date,
+          actionBy,
+          attachmentName, attachmentType, attachmentSize, attachmentDataUrl,
         });
       }
 
@@ -2245,7 +2130,6 @@
     refreshUserSelectOptions();
 
     const fromName = h.from || "";
-
     if (inputFrom) {
       inputFrom.innerHTML = "";
       if (fromName) {
@@ -2266,15 +2150,15 @@
     inputStatus.value = h.status;
     inputDate.value = h.date;
 
-    // UPDATED: set multi-select selections from existing value (string or array)
-    setMultiSelectValues(inputActionBy, getActionByArray(h));
+    // ✅ load chips
+    actionBySelected = getActionByArray(h);
+    renderActionByChips();
 
     attachmentInput.value = "";
 
     if (h.attachmentName && (h.attachmentDataUrl || h.attachmentUrl)) {
       currentAttachmentInfo.textContent =
-        "Current attachment: " +
-        h.attachmentName +
+        "Current attachment: " + h.attachmentName +
         (h.attachmentSize ? ` (${Math.round(h.attachmentSize / 1024)} KB)` : "");
     } else {
       currentAttachmentInfo.textContent = "No attachment";
@@ -2311,9 +2195,7 @@
       section.classList.toggle("d-none", v !== view);
     });
 
-    if (save) {
-      localStorage.setItem("warehouseActiveView", view);
-    }
+    if (save) localStorage.setItem("warehouseActiveView", view);
   }
 
   function initSidebarNavigation() {
@@ -2590,7 +2472,6 @@
     accountModal.show();
   }
 
-  // ===== Manual resequence button (Admin only) =====
   function initResequenceButton() {
     const btn = document.getElementById("btn-resequence-ids");
     if (!btn) return;
@@ -2623,15 +2504,9 @@
   function validateLogin(username, password) {
     normalizeAccountsPasswords();
     const acc = accounts.find(a => a.username === username);
-    if (!acc) {
-      return { ok: false, message: "Invalid username or password." };
-    }
-    if (acc.status === "Disabled") {
-      return { ok: false, message: "This account is disabled." };
-    }
-    if (acc.password !== password) {
-      return { ok: false, message: "Invalid username or password." };
-    }
+    if (!acc) return { ok: false, message: "Invalid username or password." };
+    if (acc.status === "Disabled") return { ok: false, message: "This account is disabled." };
+    if (acc.password !== password) return { ok: false, message: "Invalid username or password." };
     return { ok: true, account: acc };
   }
 
@@ -2650,9 +2525,7 @@
 
     refreshActiveAccountSelect();
     const select = document.getElementById("active-account-select");
-    if (select && activeAccountUsername) {
-      select.value = activeAccountUsername;
-    }
+    if (select && activeAccountUsername) select.value = activeAccountUsername;
     updateCurrentUserLabel();
   }
 
@@ -2660,11 +2533,8 @@
     const label = document.getElementById("current-user-label");
     if (!label) return;
     const acc = getLoggedInAccount();
-    if (!acc) {
-      label.textContent = "Not logged in";
-    } else {
-      label.textContent = `Logged in as: ${acc.username} (${acc.role || "User"})`;
-    }
+    if (!acc) label.textContent = "Not logged in";
+    else label.textContent = `Logged in as: ${acc.username} (${acc.role || "User"})`;
   }
 
   function initLogin() {
@@ -2749,9 +2619,7 @@
         users,
         accounts: accountsExport,
       };
-      const blob = new Blob([JSON.stringify(data, null, 2)], {
-        type: "application/json",
-      });
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       const dateStr = new Date().toISOString().slice(0, 10);
@@ -2786,33 +2654,20 @@
         const text = await file.text();
         const data = JSON.parse(text);
 
-        if (
-          !data ||
-          !Array.isArray(data.handovers) ||
-          !Array.isArray(data.users) ||
-          !Array.isArray(data.accounts)
-        ) {
-          alert(
-            "Invalid JSON structure.\nThe file must contain: handovers, users, and accounts arrays."
-          );
+        if (!data || !Array.isArray(data.handovers) || !Array.isArray(data.users) || !Array.isArray(data.accounts)) {
+          alert("Invalid JSON structure.\nThe file must contain: handovers, users, and accounts arrays.");
           input.value = "";
           return;
         }
 
-        const ok = confirm(
-          "This will replace all current data (handovers, users, accounts) in this browser with the data from the file.\nDo you want to continue?"
-        );
-        if (!ok) {
-          input.value = "";
-          return;
-        }
+        const ok = confirm("This will replace all current data (handovers, users, accounts) in this browser with the data from the file.\nDo you want to continue?");
+        if (!ok) { input.value = ""; return; }
 
         handovers = data.handovers;
         users = data.users;
         accounts = data.accounts;
         normalizeAccountsPasswords();
 
-        // Resequence all imported handovers so IDs start from 1 by date
         deletedHandovers = [];
         resequenceAllHandoverIdsFromOne();
         saveHandovers();
@@ -2854,42 +2709,23 @@
 
   // ===== DOMContentLoaded =====
   document.addEventListener("DOMContentLoaded", () => {
-    document
-      .getElementById("filter-from")
-      .addEventListener("change", applyFilters);
-    document
-      .getElementById("filter-to")
-      .addEventListener("change", applyFilters);
-    document
-      .getElementById("filter-status")
-      .addEventListener("change", applyFilters);
-    document
-      .getElementById("filter-priority")
-      .addEventListener("change", applyFilters);
-    document
-      .getElementById("filter-date-from")
-      .addEventListener("change", applyFilters);
-    document
-      .getElementById("filter-date-to")
-      .addEventListener("change", applyFilters);
-    document
-      .getElementById("filter-search")
-      .addEventListener("input", applyFilters);
+    document.getElementById("filter-from").addEventListener("change", applyFilters);
+    document.getElementById("filter-to").addEventListener("change", applyFilters);
+    document.getElementById("filter-status").addEventListener("change", applyFilters);
+    document.getElementById("filter-priority").addEventListener("change", applyFilters);
+    document.getElementById("filter-date-from").addEventListener("change", applyFilters);
+    document.getElementById("filter-date-to").addEventListener("change", applyFilters);
+    document.getElementById("filter-search").addEventListener("input", applyFilters);
 
-    document
-      .getElementById("btn-reset-filters")
-      .addEventListener("click", resetFilters);
+    document.getElementById("btn-reset-filters").addEventListener("click", resetFilters);
 
     const btnExcel = document.getElementById("btn-export-excel");
-    if (btnExcel) {
-      btnExcel.addEventListener("click", exportHandoverExcel);
-    }
+    if (btnExcel) btnExcel.addEventListener("click", exportHandoverExcel);
 
     loadUsers();
     loadHandovers();
     loadDeletedHandovers();
 
-    // Resequence all existing handovers on first load so IDs start from 1 by date
     resequenceAllHandoverIdsFromOne();
     saveHandovers();
     saveDeletedHandovers();
@@ -2911,7 +2747,7 @@
     initImportJson();
     refreshActiveAccountSelect();
     initLogout();
-    initResequenceButton(); // Initialize manual resequence button
+    initResequenceButton();
 
     initLogin();
     renderDeletedHandovers();
