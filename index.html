@@ -331,13 +331,13 @@
 
   <!-- Main Panel -->
   <main class="main-panel">
-    <!-- DASHBOARD (ACTIVE ONLY: NOT Completed) -->
+    <!-- DASHBOARD -->
     <section class="view-section" data-view="dashboard">
       <div class="top-bar">
         <div>
           <div class="top-bar-title">Warehouse Handover Overview</div>
           <div style="font-size: 0.85rem; color: #6b7280">
-            Active handovers (Completed are hidden here and shown in the Completed page).
+            Handovers overview (Completed will also remain visible here).
           </div>
         </div>
 
@@ -355,11 +355,11 @@
         </div>
       </div>
 
-      <!-- Stat cards (ACTIVE ONLY) -->
+      <!-- Stat cards -->
       <section class="cards-grid">
         <div class="stat-card">
           <div class="d-flex justify-content-between align-items-center">
-            <span class="stat-label">Active Handovers</span>
+            <span class="stat-label">Handovers</span>
             <i class="bi bi-arrows-move"></i>
           </div>
           <div class="stat-value" id="stat-total">0</div>
@@ -418,7 +418,7 @@
               <option>Pending</option>
               <option>In Progress</option>
               <option>Delayed</option>
-              <!-- Completed is not shown in Dashboard list, but you can still filter it in Reports/Completed page -->
+              <option>Completed</option>
             </select>
           </div>
           <div>
@@ -446,12 +446,12 @@
         </div>
       </section>
 
-      <!-- Active Table -->
+      <!-- Table -->
       <div class="row mt-2 g-3">
         <div class="col-12">
           <section class="table-card table-card--resizable">
             <div class="d-flex justify-content-between align-items-center mb-2">
-              <h6 class="mb-0">Handover List (Active)</h6>
+              <h6 class="mb-0">Handover List</h6>
               <span id="table-count" style="font-size: 0.8rem; color: #6b7280"></span>
             </div>
             <div class="table-responsive">
@@ -484,7 +484,7 @@
         <div>
           <div class="top-bar-title">Completed Handovers</div>
           <div style="font-size: 0.85rem; color: #6b7280">
-            All handovers marked as Completed (hidden from the Dashboard list).
+            All handovers marked as Completed.
           </div>
         </div>
       </div>
@@ -1145,7 +1145,7 @@
     );
   }
 
-  // Dashboard shows ACTIVE only (hide Completed from list for everyone)
+  // Kept as-is (not used anymore for dashboard in this version)
   function getVisibleActiveHandovers() {
     return getVisibleAllHandovers().filter(h => h.status !== "Completed");
   }
@@ -1294,7 +1294,7 @@
     else label.textContent = `Logged in as: ${acc.username} (${acc.role || "User"})`;
   }
 
-  // ===== Dashboard Filtering (ACTIVE only) =====
+  // ===== Dashboard Filtering (NOW INCLUDES Completed) =====
   function applyFilters() {
     const from = document.getElementById("filter-from").value;
     const to = document.getElementById("filter-to").value;
@@ -1304,7 +1304,8 @@
     const dateTo = document.getElementById("filter-date-to").value;
     const search = document.getElementById("filter-search").value.toLowerCase();
 
-    const base = getVisibleActiveHandovers();
+    // ✅ CHANGE: base is ALL visible handovers (Completed stays in list)
+    const base = getVisibleAllHandovers();
 
     filteredHandovers = base.filter(h => {
       let ok = true;
@@ -1338,7 +1339,9 @@
     document.getElementById("filter-date-from").value = "";
     document.getElementById("filter-date-to").value = "";
     document.getElementById("filter-search").value = "";
-    filteredHandovers = getVisibleActiveHandovers();
+
+    // ✅ CHANGE: show all (including Completed) in dashboard table
+    filteredHandovers = getVisibleAllHandovers();
     renderActiveTable();
   }
 
@@ -1557,7 +1560,7 @@
         h.status = "Completed";
         saveHandovers();
 
-        // Completed must disappear from Dashboard list for everyone
+        // ✅ CHANGE: Completed should NOT disappear from Dashboard list
         applyFilters();
       });
     });
@@ -1688,7 +1691,7 @@
     if (!canActionBy) inputActionBy.setAttribute("disabled", "disabled");
     else inputActionBy.removeAttribute("disabled");
 
-    // Include-me switch should follow ActionBy permission (only useful if you can edit actionBy)
+    // Include-me switch should follow ActionBy permission
     if (!canActionBy) includeMeSwitch.setAttribute("disabled", "disabled");
     else includeMeSwitch.removeAttribute("disabled");
 
@@ -1781,12 +1784,9 @@
         // Default: include me switch ON, but user can turn it OFF
         const myName = (acc.employeeName || "").trim();
         includeMeSwitch.checked = !!myName;
-        // Default actionBy selection is empty, then add me if switch ON
         setMultiSelectValues(inputActionBy, []);
         if (includeMeSwitch.checked && myName) setMultiSelectValues(inputActionBy, [myName]);
 
-        // In new mode, Action By must have at least 1 selection. If user turns off include-me,
-        // they must select someone else before saving (required).
         setHandoverFormPermissions(null, "new");
 
         modalTitleEl.textContent = "New Handover";
@@ -1832,29 +1832,24 @@
         const current = handovers.find(h => h.id === editingId);
         if (!current) return;
 
-        // Enforce edit permissions:
         const allowEdit = canEditAnyFields(current) || canEditStatus(current) || canEditActionBy(current);
         if (!allowEdit) {
           alert("You are not allowed to edit this handover.");
           return;
         }
 
-        // Keep current attachment if not replaced
         attachmentName = current.attachmentName || null;
         attachmentType = current.attachmentType || null;
         attachmentSize = current.attachmentSize || null;
         attachmentDataUrl = current.attachmentDataUrl || current.attachmentUrl || null;
 
-        // Action By: only Admin or Creator can change it
         if (!canEditActionBy(current)) {
           actionBy = getActionByArray(current);
         }
 
-        // Status: only those allowed can change it
         let finalStatus = current.status;
         if (canEditStatus(current)) finalStatus = status;
 
-        // Other fields: only those allowed can change them
         let finalFrom = current.from;
         let finalTo = current.to;
         let finalItems = current.items;
@@ -1885,7 +1880,6 @@
         const idx = handovers.findIndex(h => h.id === editingId);
         handovers[idx] = {
           ...current,
-          // core fields
           from: finalFrom,
           to: finalTo,
           items: finalItems,
@@ -1893,11 +1887,8 @@
           priority: finalPriority,
           status: finalStatus,
           date: finalDate,
-          // action by
           actionBy,
-          // creator stays
           createdBy: current.createdBy || current.from || employeeMe,
-          // attachment
           attachmentName,
           attachmentType,
           attachmentSize,
@@ -1905,10 +1896,7 @@
         };
 
       } else {
-        // New
         const id = inputId.value;
-
-        // createdBy must be employee (not username)
         const createdBy = employeeMe || from;
 
         let attachmentData = null;
@@ -1943,7 +1931,6 @@
 
       saveHandovers();
 
-      // If status becomes Completed, it must disappear from dashboard list immediately
       applyFilters();
       handoverModal.hide();
       attachmentInput.value = "";
@@ -1960,7 +1947,6 @@
     handoverForm.reset();
     refreshUserSelectOptions();
 
-    // From locked after creation
     inputFrom.innerHTML = "";
     const opt = document.createElement("option");
     opt.value = h.from || "";
@@ -1979,7 +1965,6 @@
 
     setMultiSelectValues(inputActionBy, getActionByArray(h));
 
-    // Include-me switch reflects whether my name is selected (if available)
     const acc = getLoggedInAccount();
     const myName = (acc?.employeeName || "").trim();
     includeMeSwitch.checked = myName ? getActionByArray(h).includes(myName) : false;
@@ -2003,7 +1988,6 @@
     const navLinks = document.querySelectorAll(".sidebar-nav .nav-link");
     const views = document.querySelectorAll(".view-section");
 
-    // Admin-only pages
     if (view === "admin-users" || view === "deleted-handovers") {
       const acc = getLoggedInAccount();
       if (!acc || acc.role !== "Admin") {
@@ -2298,7 +2282,6 @@
       options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } },
     });
 
-    // Count per assignee (multi)
     const byUser = {};
     base.forEach(h => {
       const assignees = getActionByArray(h);
@@ -2317,9 +2300,9 @@
     });
   }
 
-  // ===== Excel Export (Active filtered if available, else visible active) =====
+  // ===== Excel Export =====
   function exportHandoverExcel() {
-    const source = (filteredHandovers && filteredHandovers.length > 0) ? filteredHandovers : getVisibleActiveHandovers();
+    const source = (filteredHandovers && filteredHandovers.length > 0) ? filteredHandovers : getVisibleAllHandovers();
 
     const data = source.map(h => ({
       "HNDR ID": h.id,
@@ -2341,8 +2324,8 @@
 
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Active Handovers");
-    XLSX.writeFile(wb, "Handover_Active_List.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "Handovers");
+    XLSX.writeFile(wb, "Handover_List.xlsx");
   }
 
   // ===== Login Handling =====
@@ -2394,8 +2377,8 @@
 
       showApp();
 
-      // Visible active on dashboard
-      filteredHandovers = getVisibleActiveHandovers();
+      // ✅ CHANGE: Visible list includes Completed
+      filteredHandovers = getVisibleAllHandovers();
       applyFilters();
 
       const savedView = localStorage.getItem("warehouseActiveView") || "dashboard";
@@ -2410,8 +2393,11 @@
         activeAccountUsername = stored;
         saveActiveAccount();
         showApp();
-        filteredHandovers = getVisibleActiveHandovers();
+
+        // ✅ CHANGE: Visible list includes Completed
+        filteredHandovers = getVisibleAllHandovers();
         applyFilters();
+
         const savedView = localStorage.getItem("warehouseActiveView") || "dashboard";
         setActiveView(savedView, false);
         return;
@@ -2442,7 +2428,7 @@
         handovers,
         users,
         accounts: accountsExport,
-        deletedHandovers, // include for admin backup
+        deletedHandovers,
       };
 
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -2490,7 +2476,6 @@
         accounts = data.accounts;
         deletedHandovers = Array.isArray(data.deletedHandovers) ? data.deletedHandovers : [];
 
-        // Normalize
         handovers.forEach(h => {
           if (!h.createdBy) h.createdBy = h.from || "";
           if (!h.actionBy) h.actionBy = [];
@@ -2504,8 +2489,6 @@
         });
 
         normalizeAccountsPasswords();
-
-        // Resequence active IDs (no gaps)
         resequenceActiveHandovers();
 
         saveHandovers();
@@ -2516,7 +2499,8 @@
         renderUsers();
         refreshUserSelectOptions();
         renderAccounts();
-        filteredHandovers = getVisibleActiveHandovers();
+
+        filteredHandovers = getVisibleAllHandovers();
         applyFilters();
 
         alert("Data imported successfully.");
